@@ -68,7 +68,7 @@
 </head>
 <body>
 
-  <!-- Security Login Screen -->
+  <!-- Security Login -->
   <div id="loginScreen">
     <div class="login-box">
       <h2>🔐 NSE F&O Terminal</h2>
@@ -78,7 +78,7 @@
     </div>
   </div>
 
-  <!-- Main Header -->
+  <!-- Header -->
   <div class="header">
     <div>
       <h2 style="font-size: 17px;" id="mainTitle">NSE F&O Terminal</h2>
@@ -93,9 +93,9 @@
 
   <!-- Navigation Tabs -->
   <div class="nav-tabs">
-    <button class="tab-btn active" onclick="switchTab('terminalTab')">📈 Trading Terminal</button>
+    <button class="tab-btn active" id="tabBtnTerminal" onclick="switchTab('terminalTab')">📈 Trading Terminal</button>
     <button class="tab-btn" id="btnAdminPool" onclick="switchTab('poolTab')">🏛️ Master Pool</button>
-    <button class="tab-btn" onclick="switchTab('billingTab')">🧾 Weekly Statements</button>
+    <button class="tab-btn" id="tabBtnBilling" onclick="switchTab('billingTab')">🧾 Weekly Statements</button>
     <button class="tab-btn" id="btnManage" onclick="switchTab('manageTab')">👥 Clients Manager</button>
     <button class="tab-btn" id="btnSettings" onclick="switchTab('settingsTab')">⚙️ PIN Settings</button>
   </div>
@@ -157,7 +157,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: Master Broker Pool -->
+  <!-- TAB 2: Master Broker Pool (Strict Admin Only - Zero Hardcoded Data) -->
   <div id="poolTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title">
@@ -170,8 +170,7 @@
             <th>Contract</th>
             <th>Total Buy</th>
             <th>Total Sell</th>
-            <th>Net Qty</th>
-            <th>P&L</th>
+            <th>Net Position</th>
           </tr>
         </thead>
         <tbody id="masterPoolBody"></tbody>
@@ -179,7 +178,7 @@
     </div>
   </div>
 
-  <!-- TAB 3: Weekly Billing (Includes Weekend/Testing Trades) -->
+  <!-- TAB 3: Weekly Billing -->
   <div id="billingTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title">
@@ -199,7 +198,7 @@
     </div>
   </div>
 
-  <!-- TAB 4: Client Management (With Edit & ID Preservation) -->
+  <!-- TAB 4: Client Management -->
   <div id="manageTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title" id="manageTitle">➕ Add / Edit Client</div>
@@ -269,7 +268,6 @@
   </div>
 
   <script>
-    // Live Google Sheet Webhook URL
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx60jXYN5c8Lt20FQ0DSpkSv5fw88-VCq-GqfOqA0NIiIudbxfGBZpG4LNqnyRRnXh6/exec";
 
     let adminPin = localStorage.getItem('app_admin_pin') || "9999";
@@ -280,7 +278,6 @@
     let currentRawStock = 'RELIANCE';
     let isEditingClientId = null;
 
-    // Inclusive Settlement Range (Allows live testing up to current date/time)
     function getCurrentWeekRange() {
       const now = new Date();
       const currentDay = now.getDay();
@@ -325,7 +322,6 @@
     let currentExp = getNseExpiry(0);
     let nextExp = getNseExpiry(1);
 
-    // Full 216 F&O Stocks Database
     const fnoDatabase = [
       { name: "AARTIIND", lot: 1000, price: 480.0 }, { name: "ABB", lot: 125, price: 7850.0 },
       { name: "ABBOTINDIA", lot: 40, price: 28500.0 }, { name: "ABCAPITAL", lot: 3100, price: 215.0 },
@@ -437,17 +433,9 @@
       { name: "ZOMATO", lot: 2425, price: 260.0 }, { name: "ZYDUSLIFE", lot: 900, price: 1050.0 }
     ];
 
-    let clients = JSON.parse(localStorage.getItem('app_clients_clean')) || [
-      { id: "R1", name: "Rameshbhai", branch: "rajkot", phone: "9825012345", rate: 0.01, bal: -12.50 },
-      { id: "R2", name: "Kishorbhai", branch: "rajkot", phone: "9898012345", rate: 0.02, bal: 0.00 },
-      { id: "N1", name: "Bhaveshbhai", branch: "surat", phone: "9825111111", rate: 0.01, bal: 1025.00 },
-      { id: "N2", name: "Hiteshbhai", branch: "surat", phone: "9825222222", rate: 0.01, bal: -250.00 },
-      { id: "N3", name: "Piyush Nathavani", branch: "surat", phone: "9825333333", rate: 0.01, bal: 0.00 }
-    ];
-
+    let clients = JSON.parse(localStorage.getItem('app_clients_clean')) || [];
     let trades = JSON.parse(localStorage.getItem('app_trades_clean')) || [];
 
-    // Background Google Sheet Sync
     function syncToGoogleSheet(payload) {
       if (!GOOGLE_SCRIPT_URL) return;
       fetch(GOOGLE_SCRIPT_URL, {
@@ -479,6 +467,9 @@
     }
 
     function initApp() {
+      // સુરક્ષા લોક: લોગિન થતાં જ હંમેશા પહેલું ટેબ (Trading Terminal) જ ખૂલવું જોઈએ
+      forceSwitchToDefaultTab();
+
       document.getElementById('expCurrent').innerText = `${currentExp.formatted} (Cur)`;
       document.getElementById('expNext').innerText = `${nextExp.formatted} (Next)`;
       document.getElementById('weekRangeDisplay').innerText = `Period: ${currentWeek.label}`;
@@ -487,7 +478,11 @@
         document.getElementById('branchBadge').innerText = "BRANCH: SURAT (Nareshbhai)";
         document.getElementById('branchBadge').className = "branch-badge sub-badge";
         document.getElementById('subHeader').innerText = "Surat Branch Operator";
+        
+        // સુરત શાખા માટે માસ્ટર પુલ સંપૂર્ણપણે બંધ
         document.getElementById('btnAdminPool').style.display = 'none';
+        document.getElementById('poolTab').style.display = 'none';
+        
         document.getElementById('branchField').style.display = 'none';
         document.getElementById('adminPinField').style.display = 'none';
         document.getElementById('manageTitle').innerText = "➕ Add / Edit Client (Surat)";
@@ -495,6 +490,7 @@
         document.getElementById('branchBadge').innerText = "HO: RAJKOT";
         document.getElementById('branchBadge').className = "branch-badge admin-badge";
         document.getElementById('subHeader').innerText = "Rajkot HQ (Full Admin)";
+        
         document.getElementById('btnAdminPool').style.display = 'block';
         document.getElementById('branchField').style.display = 'block';
         document.getElementById('adminPinField').style.display = 'block';
@@ -505,9 +501,31 @@
       updateContractDisplay();
       renderClients();
       renderTrades();
-      renderMasterPool();
+      if (userRole === 'admin') {
+        renderMasterPool();
+      }
       renderBills();
       renderClientsList();
+    }
+
+    function forceSwitchToDefaultTab() {
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('terminalTab').style.display = 'block';
+      document.getElementById('tabBtnTerminal').classList.add('active');
+    }
+
+    // Role-Guarded Tab Switching
+    function switchTab(tabId) {
+      if (userRole !== 'admin' && tabId === 'poolTab') {
+        return; // Security guard: Surat branch can never open Master Pool
+      }
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabId).style.display = 'block';
+      if (event && event.target) {
+        event.target.classList.add('active');
+      }
     }
 
     function autoGenerateClientId() {
@@ -585,13 +603,6 @@
       }
     });
 
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById(tabId).style.display = 'block';
-      event.target.classList.add('active');
-    }
-
     function renderClients() {
       const select = document.getElementById('clientSelect');
       select.innerHTML = "";
@@ -630,17 +641,47 @@
       });
     }
 
+    // Dynamic Master Broker Pool Calculation
     function renderMasterPool() {
       const tbody = document.getElementById('masterPoolBody');
-      tbody.innerHTML = `
-        <tr>
-          <td><b>RELIANCE ${currentExp.monthCode} FUT</b></td>
-          <td>350</td>
-          <td>0</td>
-          <td class="green">+350 (LONG)</td>
-          <td class="green">+₹1,250.00</td>
-        </tr>
-      `;
+      tbody.innerHTML = "";
+
+      if (trades.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--muted); padding:14px;">Master Pool is empty (No active trades).</td></tr>`;
+        return;
+      }
+
+      const poolMap = {};
+      trades.forEach(t => {
+        if (!poolMap[t.contract]) {
+          poolMap[t.contract] = { buy: 0, sell: 0 };
+        }
+        if (t.action === 'BUY') {
+          poolMap[t.contract].buy += t.qty;
+        } else {
+          poolMap[t.contract].sell += t.qty;
+        }
+      });
+
+      for (let contract in poolMap) {
+        const item = poolMap[contract];
+        const net = item.buy - item.sell;
+        let netHtml = "";
+        if (net > 0) {
+          netHtml = `<span class="green">+${net} (LONG)</span>`;
+        } else if (net < 0) {
+          netHtml = `<span class="red">${net} (SHORT)</span>`;
+        } else {
+          netHtml = `<span style="color:var(--muted)">0 (SQUARED / HEDGED)</span>`;
+        }
+
+        tbody.innerHTML += `<tr>
+          <td><b>${contract}</b></td>
+          <td>${item.buy}</td>
+          <td>${item.sell}</td>
+          <td>${netHtml}</td>
+        </tr>`;
+      }
     }
 
     function getClientWeeklyTrades(clientId) {
@@ -699,7 +740,14 @@
     function renderBills() {
       const tbody = document.getElementById('billsBody');
       tbody.innerHTML = "";
-      clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
+      const filteredClients = clients.filter(c => userRole === 'admin' || c.branch === 'surat');
+      
+      if (filteredClients.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--muted); padding:14px;">No clients available.</td></tr>`;
+        return;
+      }
+
+      filteredClients.forEach(c => {
         tbody.innerHTML += `<tr>
           <td><b>${c.id}</b> - ${c.name}</td>
           <td class="${c.bal>=0?'green':'red'}">₹${c.bal.toFixed(2)}</td>
@@ -713,7 +761,14 @@
     function renderClientsList() {
       const tbody = document.getElementById('clientsListBody');
       tbody.innerHTML = "";
-      clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
+      const filtered = clients.filter(c => userRole === 'admin' || c.branch === 'surat');
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--muted); padding:14px;">No clients added yet.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(c => {
         tbody.innerHTML += `<tr>
           <td><b>${c.id}</b></td>
           <td>${c.name}</td>
@@ -798,11 +853,17 @@
     }
 
     function removeClient(id) {
-      if (confirm(`Remove client ${id}? Their ID will be recycled.`)) {
+      if (confirm(`Remove client ${id}? All active positions for this client will be cleared and the ID will be recycled.`)) {
         clients = clients.filter(c => c.id !== id);
+        trades = trades.filter(t => t.clientId !== id);
         localStorage.setItem('app_clients_clean', JSON.stringify(clients));
+        localStorage.setItem('app_trades_clean', JSON.stringify(trades));
         renderClients();
         renderClientsList();
+        renderTrades();
+        if (userRole === 'admin') {
+          renderMasterPool();
+        }
         renderBills();
         autoGenerateClientId();
       }
@@ -811,7 +872,7 @@
     function placeOrder(action) {
       const selectedId = document.getElementById('clientSelect').value;
       const clientObj = clients.find(c => c.id === selectedId);
-      if (!clientObj) return alert("Please select a valid client!");
+      if (!clientObj) return alert("Please select or add a client first!");
 
       const contract = document.getElementById('stockSearch').value;
       const qty = parseInt(document.getElementById('qtyInput').value) || 0;
@@ -858,6 +919,9 @@
 
       alert(`Order Executed & Logged to Google Sheet:\nTime: ${formattedTimestamp}\nClient: ${clientObj.id} - ${clientObj.name}\nContract: ${contract}\nQty: ${qty} @ ₹${price}`);
       renderTrades();
+      if (userRole === 'admin') {
+        renderMasterPool();
+      }
       renderBills();
     }
 
@@ -868,6 +932,7 @@
         localStorage.setItem('app_trades_clean', JSON.stringify(trades));
         alert("Trade canceled.");
         renderTrades();
+        renderMasterPool();
         renderBills();
       } else if (pin !== null) {
         alert("Incorrect PIN!");
