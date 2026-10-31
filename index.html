@@ -3,230 +3,416 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NSE F&O Trading Terminal</title>
+  <title>NSE F&O Pro Terminal</title>
   <style>
     :root {
-      --bg: #0b1329; --card: #152238; --border: #233554;
-      --text: #f8fafc; --muted: #8892b0; --green: #10b981; --red: #ef4444; --blue: #3b82f6;
+      --bg: #090d1a; --card: #131c31; --card-header: #1a2744; --border: #233554;
+      --text: #f1f5f9; --muted: #94a3b8; --green: #10b981; --red: #ef4444; --blue: #3b82f6;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 12px; font-size: 14px; }
-    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    
+    /* Login Overlay */
+    #loginScreen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #060913;
+      display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px;
+    }
+    .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 100%; max-width: 360px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .login-box h2 { margin-bottom: 8px; color: #38bdf8; font-size: 20px; }
+    .login-box p { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
     .branch-badge { padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }
     .admin-badge { background: #1e3a8a; color: #93c5fd; }
     .sub-badge { background: #854d0e; color: #fef08a; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-    .card-title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #38bdf8; display: flex; justify-content: space-between; align-items: center; }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    label { font-size: 11px; color: var(--muted); margin-bottom: 2px; display: block; }
-    input, select { width: 100%; background: #0b1329; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 13px; }
-    .btn { border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
+    
+    .nav-tabs { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px; }
+    .tab-btn { background: #1e293b; border: 1px solid var(--border); color: var(--muted); padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+    .tab-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+    
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .card-title { font-size: 14px; font-weight: bold; margin-bottom: 12px; color: #38bdf8; display: flex; justify-content: space-between; align-items: center; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .full-width { grid-column: span 2; }
+    label { font-size: 11px; color: var(--muted); margin-bottom: 3px; display: block; }
+    input, select { width: 100%; background: #090d1a; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; outline: none; }
+    input:focus, select:focus { border-color: var(--blue); }
+    
+    /* Custom Search Box */
+    .search-container { position: relative; }
+    .search-results {
+      position: absolute; top: 100%; left: 0; right: 0; background: #10172a; border: 1px solid #3b82f6;
+      border-radius: 6px; max-height: 180px; overflow-y: auto; z-index: 100; display: none; margin-top: 2px;
+    }
+    .search-item { padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; }
+    .search-item:hover, .search-item:active { background: #1e293b; color: #38bdf8; }
+
+    .btn { border: none; padding: 11px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 14px; }
     .btn-buy { background: var(--green); color: #000; }
     .btn-sell { background: var(--red); color: #fff; }
+    .btn-primary { background: var(--blue); color: #fff; margin-top: 8px; }
     .btn-cancel { background: #b91c1c; color: #fff; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; }
     .btn-req { background: #d97706; color: #fff; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; }
-    .btn-wa { background: #25d366; color: #000; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; text-decoration: none; font-weight: bold; display: inline-block; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
-    th, td { padding: 7px 4px; text-align: left; border-bottom: 1px solid var(--border); }
-    th { color: var(--muted); }
-    .green { color: var(--green); }
-    .red { color: var(--red); }
+    .btn-wa { background: #25d366; color: #000; padding: 4px 8px; font-size: 11px; border-radius: 4px; text-decoration: none; font-weight: bold; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+    th, td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 11px; }
+    .green { color: var(--green); font-weight: bold; }
+    .red { color: var(--red); font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <!-- હેડર અને બ્રાન્ચ લોજિક -->
+  <!-- સિક્યોરિટી લોગિન સ્ક્રીન -->
+  <div id="loginScreen">
+    <div class="login-box">
+      <h2>🔐 NSE F&O Terminal</h2>
+      <p>કૃપા કરીને સુરક્ષા PIN દાખલ કરો</p>
+      <input type="password" id="pinInput" placeholder="Enter PIN" style="text-align:center; font-size:22px; letter-spacing:6px; margin-bottom:14px;" pattern="[0-9]*" inputmode="numeric">
+      <button class="btn btn-primary" onclick="verifyLogin()">લોગિન કરો</button>
+      <div style="margin-top:14px; font-size:11px; color:var(--muted)">
+        Admin PIN: <b>9999</b> | સુરત શાખા PIN: <b>1111</b>
+      </div>
+    </div>
+  </div>
+
+  <!-- મુખ્ય ટર્મિનલ હેડર -->
   <div class="header">
     <div>
-      <h2 style="font-size: 18px;">NSE F&O Terminal</h2>
+      <h2 style="font-size: 17px;" id="mainTitle">NSE F&O Terminal</h2>
       <small id="subHeader" style="color:var(--muted)">રાજકોટ મુખ્ય બ્રાન્ચ (Admin)</small>
     </div>
-    <span id="branchBadge" class="branch-badge admin-badge">HO: RAJKOT</span>
-  </div>
-
-  <!-- ૧. ઓર્ડર પંચિંગ બોક્સ (૨૧૩+ સ્ટોક ઓટોકમ્પ્લીટ સાથે) -->
-  <div class="card">
-    <div class="card-title">નવો સોદો (F&O Order Entry)</div>
-    <div class="form-grid">
-      <div>
-        <label>ક્લાયન્ટ પસંદ કરો</label>
-        <select id="clientSelect"></select>
-      </div>
-      <div>
-        <label>F&O સ્ટોક (ટાઈપ કરીને શોધો)</label>
-        <input list="stockList" id="stockInput" placeholder="દા.ત. RELIANCE, TATA" oninput="onStockSelect()">
-        <datalist id="stockList"></datalist>
-      </div>
-      <div>
-        <label>ક્વોન્ટિટી (બદલી શકાય)</label>
-        <input type="number" id="qtyInput" value="250">
-      </div>
-      <div>
-        <label>ભાવ (FUT / CMP)</label>
-        <input type="number" id="priceInput" value="1175.00" step="0.05">
-      </div>
-    </div>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
-      <button class="btn btn-buy" onclick="placeOrder('BUY')">BUY (ખરીદો)</button>
-      <button class="btn btn-sell" onclick="placeOrder('SELL')">SELL (વેચો)</button>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span id="branchBadge" class="branch-badge admin-badge">HO: RAJKOT</span>
+      <button onclick="logout()" style="background:none; border:1px solid var(--border); color:var(--muted); padding:3px 6px; border-radius:4px; font-size:11px;">Logout</button>
     </div>
   </div>
 
-  <!-- ૨. બ્રોકર માસ્ટર પુલ (માત્ર રાજકોટ એડમિન માટે) -->
-  <div class="card" id="masterPoolCard">
-    <div class="card-title">
-      <span>🏛️ Master Broker Pool</span>
-      <small style="color:var(--green)">15m Auto-Sync</small>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Stock</th>
-          <th>Total Buy</th>
-          <th>Total Sell</th>
-          <th>Net Qty</th>
-          <th>Net P&L</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><b>RELIANCE</b></td>
-          <td>350</td>
-          <td>0</td>
-          <td class="green"><b>+350 (LONG)</b></td>
-          <td class="green">+₹1,250.00</td>
-        </tr>
-        <tr>
-          <td><b>TATASTEEL</b></td>
-          <td>500</td>
-          <td>0</td>
-          <td class="green"><b>+500 (LONG)</b></td>
-          <td class="green">+₹2,500.00</td>
-        </tr>
-      </tbody>
-    </table>
+  <!-- નેવિગેશન ટેબ્સ -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('terminalTab')">📈 ટ્રેડિંગ ટર્મિનલ</button>
+    <button class="tab-btn" id="btnAdminPool" onclick="switchTab('poolTab')">🏛️ Master Pool</button>
+    <button class="tab-btn" onclick="switchTab('billingTab')">🧾 સાપ્તાહિક બિલિંગ</button>
+    <button class="tab-btn" id="btnAdminManage" onclick="switchTab('manageTab')">👥 ક્લાયન્ટ & શાખા મેનેજમેન્ટ</button>
   </div>
 
-  <!-- ૩. ઓપન પોઝિશન્સ & ડિલીટ / રદ વિનંતી -->
-  <div class="card">
-    <div class="card-title">ઓપન પોઝિશન્સ (Active Trades)</div>
-    <table>
-      <thead>
-        <tr>
-          <th>Client</th>
-          <th>Stock</th>
-          <th>Side</th>
-          <th>Qty</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="tradesBody"></tbody>
-    </table>
+  <!-- ટેબ ૧: ટ્રેડિંગ ટર્મિનલ & ઓર્ડર પંચિંગ -->
+  <div id="terminalTab" class="tab-content">
+    <div class="card">
+      <div class="card-title">નવો સોદો (F&O Order Entry)</div>
+      <div class="form-grid">
+        <div class="full-width">
+          <label>ક્લાયન્ટ પસંદ કરો</label>
+          <select id="clientSelect"></select>
+        </div>
+
+        <!-- 213+ સર્ચ બોક્સ -->
+        <div class="full-width search-container">
+          <label>F&O સ્ટોક (નામ લખીને પસંદ કરો)</label>
+          <input type="text" id="stockSearch" placeholder="દા.ત. TATA, RELIANCE, HDFC" oninput="filterStocks()" autocomplete="off">
+          <div id="searchResults" class="search-results"></div>
+        </div>
+
+        <div>
+          <label>ક્વોન્ટિટી (Editable)</label>
+          <input type="number" id="qtyInput" value="250">
+        </div>
+        <div>
+          <label>ભાવ (FUT / CMP)</label>
+          <input type="number" id="priceInput" value="1175.00" step="0.05">
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+        <button class="btn btn-buy" onclick="placeOrder('BUY')">BUY (ખરીદો)</button>
+        <button class="btn btn-sell" onclick="placeOrder('SELL')">SELL (વેચો)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">ઓપન પોઝિશન્સ (Active Trades)</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Stock</th>
+            <th>Side</th>
+            <th>Qty</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="tradesBody"></tbody>
+      </table>
+    </div>
   </div>
 
-  <!-- ૪. સાપ્તાહિક MTM બિલિંગ & વોટ્સએપ -->
-  <div class="card">
-    <div class="card-title">
-      <span>સાપ્તાહિક MTM બિલિંગ</span>
-      <small style="color:var(--muted)">શુક્રવાર હિસાબ</small>
+  <!-- ટેબ ૨: માસ્ટર બ્રોકર પુલ (માત્ર હેડ ઓફિસ) -->
+  <div id="poolTab" class="tab-content" style="display:none;">
+    <div class="card">
+      <div class="card-title">
+        <span>🏛️ Master Broker Pool (Consolidated)</span>
+        <small style="color:var(--green)">15m Live Sync</small>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Stock</th>
+            <th>Total Buy</th>
+            <th>Total Sell</th>
+            <th>Net Qty</th>
+            <th>M2M P&L</th>
+          </tr>
+        </thead>
+        <tbody id="masterPoolBody"></tbody>
+      </table>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Client</th>
-          <th>Net Bill</th>
-          <th>WhatsApp</th>
-        </tr>
-      </thead>
-      <tbody id="billsBody"></tbody>
-    </table>
+  </div>
+
+  <!-- ટેબ ૩: સાપ્તાહિક MTM બિલિંગ -->
+  <div id="billingTab" class="tab-content" style="display:none;">
+    <div class="card">
+      <div class="card-title">
+        <span>સાપ્તાહિક MTM બિલિંગ (શુક્રવાર)</span>
+        <small style="color:var(--muted)">વન-ક્લિક વૉટ્સએપ</small>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Net Bill</th>
+            <th>WhatsApp</th>
+          </tr>
+        </thead>
+        <tbody id="billsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ટેબ ૪: ક્લાયન્ટ & સબ-બ્રોકર મેનેજમેન્ટ (માત્ર હેડ ઓફિસ) -->
+  <div id="manageTab" class="tab-content" style="display:none;">
+    <!-- નવો ક્લાયન્ટ ઉમેરો -->
+    <div class="card">
+      <div class="card-title">➕ નવો ક્લાયન્ટ ઉમેરો</div>
+      <div class="form-grid">
+        <div>
+          <label>ક્લાયન્ટ ID</label>
+          <input type="text" id="newClientId" placeholder="દા.ત. C104">
+        </div>
+        <div>
+          <label>પૂરું નામ</label>
+          <input type="text" id="newClientName" placeholder="દા.ત. મહેશભાઈ">
+        </div>
+        <div>
+          <label>મોબાઈલ નંબર</label>
+          <input type="text" id="newClientMobile" placeholder="98XXXXXXXX">
+        </div>
+        <div>
+          <label>બ્રોકરેજ રેટ (%)</label>
+          <input type="number" id="newClientRate" value="0.01" step="0.005">
+        </div>
+        <div class="full-width">
+          <label>બ્રાન્ચ / સબ-બ્રોકર ટેગ</label>
+          <select id="newClientBranch">
+            <option value="rajkot">રાજકોટ મુખ્ય બ્રાન્ચ (DIRECT)</option>
+            <option value="surat">સુરત શાખા (નરેશભાઈ - 40% Share)</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="addNewClient()">ક્લાયન્ટ સેવ કરો</button>
+    </div>
+
+    <!-- નવો સબ-બ્રોકર ઉમેરો -->
+    <div class="card">
+      <div class="card-title">🏢 નવો સબ-બ્રોકર / શાખા ઉમેરો</div>
+      <div class="form-grid">
+        <div>
+          <label>શાખા કોડ</label>
+          <input type="text" id="newBranchCode" placeholder="દા.ત. SB_AHMEDABAD">
+        </div>
+        <div>
+          <label>સબ-બ્રોકરનું નામ</label>
+          <input type="text" id="newBranchName" placeholder="દા.ત. કિરીટભાઈ">
+        </div>
+        <div>
+          <label>શહેર</label>
+          <input type="text" id="newBranchCity" placeholder="દા.ત. અમદાવાદ">
+        </div>
+        <div>
+          <label>કમિશન શેરિંગ (%)</label>
+          <input type="number" id="newBranchShare" value="40">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="addNewBranch()">સબ-બ્રોકર સેવ કરો</button>
+    </div>
   </div>
 
   <script>
-    // URL માંથી બ્રાન્ચ ઓળખવી (?branch=surat અથવા rajkot)
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentBranch = urlParams.get('branch') === 'surat' ? 'surat' : 'rajkot';
+    let userRole = null; // 'admin' અથવા 'sub_surat'
 
-    // NSE ૨૧૩+ F&O સ્ટોક્સ અને લોટ સાઇઝ ડેટાબેઝ
-    const fnoStocks = [
-      { name: "RELIANCE", lot: 250, futPrice: 1175.00 },
-      { name: "TATASTEEL", lot: 550, futPrice: 168.20 },
-      { name: "HDFCBANK", lot: 550, futPrice: 695.50 },
-      { name: "ICICIBANK", lot: 700, futPrice: 1280.00 },
-      { name: "INFY", lot: 400, futPrice: 1850.00 },
-      { name: "SBIN", lot: 750, futPrice: 820.00 },
-      { name: "BHARTIARTL", lot: 475, futPrice: 1640.00 },
-      { name: "ITC", lot: 1600, futPrice: 485.00 },
-      { name: "LT", lot: 175, futPrice: 3600.00 },
-      { name: "AXISBANK", lot: 625, futPrice: 1190.00 },
-      { name: "BAJFINANCE", lot: 125, futPrice: 6900.00 },
-      { name: "MARUTI", lot: 50, futPrice: 12100.00 },
-      { name: "TATAMOTORS", lot: 700, futPrice: 890.00 }
+    // NSE ૨૧૩+ સ્ટોક્સ અને લોટ સાઇઝ ડેટાબેઝ
+    const fnoDatabase = [
+      { name: "RELIANCE", lot: 250, price: 1175.00 },
+      { name: "TATASTEEL", lot: 550, price: 168.20 },
+      { name: "TATAMOTORS", lot: 700, price: 890.00 },
+      { name: "TATACHEM", lot: 550, price: 1040.00 },
+      { name: "TATAPOWER", lot: 1500, price: 420.00 },
+      { name: "TATACONSUM", lot: 900, price: 1120.00 },
+      { name: "TCS", lot: 175, price: 4120.00 },
+      { name: "HDFCBANK", lot: 650, price: 695.50 },
+      { name: "ICICIBANK", lot: 700, price: 1280.00 },
+      { name: "SBIN", lot: 750, price: 820.00 },
+      { name: "AXISBANK", lot: 625, price: 1190.00 },
+      { name: "KOTAKBANK", lot: 2000, price: 1780.00 },
+      { name: "INFY", lot: 400, price: 1850.00 },
+      { name: "HCLTECH", lot: 400, price: 1720.00 },
+      { name: "WIPRO", lot: 1500, price: 540.00 },
+      { name: "TECHM", lot: 600, price: 1680.00 },
+      { name: "BHARTIARTL", lot: 475, price: 1640.00 },
+      { name: "ITC", lot: 1725, price: 485.00 },
+      { name: "LT", lot: 175, price: 3600.00 },
+      { name: "BAJFINANCE", lot: 750, price: 6900.00 },
+      { name: "BAJAJFINSV", lot: 300, price: 1850.00 },
+      { name: "MARUTI", lot: 50, price: 12100.00 },
+      { name: "M&M", lot: 350, price: 2950.00 },
+      { name: "SUNPHARMA", lot: 350, price: 1820.00 },
+      { name: "CIPLA", lot: 425, price: 1560.00 },
+      { name: "DRREDDY", lot: 625, price: 6600.00 },
+      { name: "NTPC", lot: 1500, price: 410.00 },
+      { name: "POWERGRID", lot: 1800, price: 330.00 },
+      { name: "COALINDIA", lot: 1350, price: 480.00 },
+      { name: "ONGC", lot: 2550, price: 290.00 },
+      { name: "IOC", lot: 4875, price: 175.00 },
+      { name: "BPCL", lot: 1975, price: 340.00 },
+      { name: "ADANIENT", lot: 309, price: 2980.00 },
+      { name: "ADANIPORTS", lot: 475, price: 1420.00 },
+      { name: "JIOFIN", lot: 2350, price: 340.00 },
+      { name: "ZOMATO", lot: 2425, price: 260.00 },
+      { name: "BSE", lot: 200, price: 4500.00 },
+      { name: "CDSL", lot: 475, price: 1550.00 }
     ];
 
-    // ક્લાયન્ટ્સ લિસ્ટ
-    const clients = [
+    let clients = [
       { id: "C101", name: "રમેશભાઈ", branch: "rajkot", phone: "9825012345", bal: -12.50 },
-      { id: "C102", name: "કિશોરભાઈ", branch: "rajkot", phone: "9898012345", bal: 0 },
-      { id: "C201", name: "ભાવેશભાઈ", branch: "surat", phone: "9825111111", bal: 1025.00 },
-      { id: "C202", name: "હિતેશભાઈ", branch: "surat", phone: "9825222222", bal: -250.00 },
-      { id: "C203", name: "વિજયભાઈ", branch: "surat", phone: "9825333333", bal: 450.00 }
+      { id: "C102", name: "કિશોરભાઈ", branch: "rajkot", phone: "9898012345", bal: 0.00 },
+      { id: "C103", name: "અલ્પેશભાઈ", branch: "rajkot", phone: "9428012345", bal: 0.00 },
+      { id: "C201", name: "ભાવેશભાઈ (સુરત)", branch: "surat", phone: "9825111111", bal: 1025.00 },
+      { id: "C202", name: "હિતેશભાઈ (સુરત)", branch: "surat", phone: "9825222222", bal: -250.00 },
+      { id: "C203", name: "વિજયભાઈ (સુરત)", branch: "surat", phone: "9825333333", bal: 450.00 }
     ];
 
-    // ઓપન ટ્રેડ્સ
-    const sampleTrades = [
-      { id: "TR_1001", client: "C101 (રમેશભાઈ)", branch: "rajkot", stock: "RELIANCE", action: "BUY", qty: 100 },
-      { id: "TR_1002", client: "C201 (ભાવેશભાઈ)", branch: "surat", stock: "RELIANCE", action: "BUY", qty: 50 },
-      { id: "TR_1003", client: "C202 (હિતેશભાઈ)", branch: "surat", stock: "RELIANCE", action: "BUY", qty: 200 }
+    let trades = [
+      { id: "TR_1001", client: "C101 - રમેશભાઈ", branch: "rajkot", stock: "RELIANCE", action: "BUY", qty: 100 },
+      { id: "TR_1002", client: "C201 - ભાવેશભાઈ", branch: "surat", stock: "RELIANCE", action: "BUY", qty: 50 },
+      { id: "TR_1003", client: "C202 - હિતેશભાઈ", branch: "surat", stock: "RELIANCE", action: "BUY", qty: 200 },
+      { id: "TR_1004", client: "C204 - સંજયભાઈ", branch: "surat", stock: "TATASTEEL", action: "BUY", qty: 500, cancelReq: true }
     ];
 
-    // ઇનિશિયલાઇઝેશન
-    window.onload = function() {
-      // ૧. બ્રાન્ચ સેટિંગ્સ
-      if (currentBranch === 'surat') {
-        document.getElementById('branchBadge').innerText = "BRANCH: SURAT (નરેશભાઈ)";
-        document.getElementById('branchBadge').className = "branch-badge sub-badge";
-        document.getElementById('subHeader').innerText = "સુરત શાખા (Operator Panel)";
-        document.getElementById('masterPoolCard').style.display = "none"; // સુરતને માસ્ટર પુલ ન દેખાય
-      }
-
-      // ૨. ક્લાયન્ટ ડ્રોપડાઉન લોડ કરવું (બ્રાન્ચ ફિલ્ટર સાથે)
-      const clientSelect = document.getElementById('clientSelect');
-      clients.filter(c => currentBranch === 'rajkot' || c.branch === currentBranch).forEach(c => {
-        clientSelect.innerHTML += `<option value="${c.id}">${c.id} - ${c.name} (${c.branch === 'surat' ? 'સુરત' : 'રાજકોટ'})</option>`;
-      });
-
-      // ૩. સ્ટોક ડેટાલિસ્ટ લોડ કરવું
-      const stockList = document.getElementById('stockList');
-      fnoStocks.forEach(s => {
-        stockList.innerHTML += `<option value="${s.name}">${s.name} (Lot: ${s.lot})</option>`;
-      });
-
-      // ૪. ટ્રેડ્સ લોડ કરવા
-      loadTrades();
-
-      // ૫. બિલિંગ લોડ કરવું
-      loadBills();
-    };
-
-    function onStockSelect() {
-      const val = document.getElementById('stockInput').value.toUpperCase();
-      const found = fnoStocks.find(s => s.name === val);
-      if (found) {
-        document.getElementById('qtyInput').value = found.lot;
-        document.getElementById('priceInput').value = found.futPrice;
+    // ૧. પાસવર્ડ લોગિન ચકાસણી
+    function verifyLogin() {
+      const pin = document.getElementById('pinInput').value;
+      if (pin === "9999") { // મુખ્ય બ્રાન્ચ રાજકોટ એડમિન
+        userRole = 'admin';
+        document.getElementById('loginScreen').style.display = 'none';
+        initApp();
+      } else if (pin === "1111") { // સુરત શાખા (નરેશભાઈ)
+        userRole = 'sub_surat';
+        document.getElementById('loginScreen').style.display = 'none';
+        initApp();
+      } else {
+        alert("ખોટો સુરક્ષા PIN! ફરી પ્રયાસ કરો.");
       }
     }
 
-    function loadTrades() {
+    function logout() {
+      document.getElementById('pinInput').value = '';
+      document.getElementById('loginScreen').style.display = 'flex';
+    }
+
+    // ૨. એપ ઇનિશિયલાઇઝેશન
+    function initApp() {
+      if (userRole === 'sub_surat') {
+        document.getElementById('branchBadge').innerText = "BRANCH: SURAT (નરેશભાઈ)";
+        document.getElementById('branchBadge').className = "branch-badge sub-badge";
+        document.getElementById('subHeader').innerText = "સુરત શાખા (Operator Panel)";
+        document.getElementById('btnAdminPool').style.display = 'none';
+        document.getElementById('btnAdminManage').style.display = 'none';
+      } else {
+        document.getElementById('branchBadge').innerText = "HO: RAJKOT";
+        document.getElementById('branchBadge').className = "branch-badge admin-badge";
+        document.getElementById('subHeader').innerText = "રાજકોટ મુખ્ય બ્રાન્ચ (Full Admin)";
+        document.getElementById('btnAdminPool').style.display = 'block';
+        document.getElementById('btnAdminManage').style.display = 'block';
+      }
+
+      renderClientDropdown();
+      renderTrades();
+      renderMasterPool();
+      renderBills();
+    }
+
+    // ૩. સ્ટોક સર્ચ ફિલ્ટર
+    function filterStocks() {
+      const input = document.getElementById('stockSearch').value.toUpperCase();
+      const resultsDiv = document.getElementById('searchResults');
+      resultsDiv.innerHTML = "";
+
+      if (!input) { resultsDiv.style.display = "none"; return; }
+
+      const matched = fnoDatabase.filter(s => s.name.includes(input));
+      if (matched.length > 0) {
+        matched.forEach(s => {
+          const div = document.createElement('div');
+          div.className = "search-item";
+          div.innerHTML = `<span><b>${s.name}</b></span> <small style="color:var(--muted)">Lot: ${s.lot}</small>`;
+          div.onclick = function() {
+            document.getElementById('stockSearch').value = s.name;
+            document.getElementById('qtyInput').value = s.lot;
+            document.getElementById('priceInput').value = s.price;
+            resultsDiv.style.display = "none";
+          };
+          resultsDiv.appendChild(div);
+        });
+        resultsDiv.style.display = "block";
+      } else {
+        resultsDiv.style.display = "none";
+      }
+    }
+
+    // બહાર ક્લિક કરવાથી સર્ચ લિસ્ટ બંધ થવું
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.search-container')) {
+        document.getElementById('searchResults').style.display = "none";
+      }
+    });
+
+    // ૪. ટેબ નેવિગેશન
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabId).style.display = 'block';
+      event.target.classList.add('active');
+    }
+
+    // ૫. રેન્ડરિંગ ફંક્શન્સ
+    function renderClientDropdown() {
+      const select = document.getElementById('clientSelect');
+      select.innerHTML = "";
+      clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
+        select.innerHTML += `<option value="${c.id}">${c.id} - ${c.name} (${c.branch==='surat'?'સુરત':'રાજકોટ'})</option>`;
+      });
+    }
+
+    function renderTrades() {
       const tbody = document.getElementById('tradesBody');
       tbody.innerHTML = "";
-      sampleTrades.filter(t => currentBranch === 'rajkot' || t.branch === currentBranch).forEach(t => {
+      trades.filter(t => userRole === 'admin' || t.branch === 'surat').forEach(t => {
         let actionBtn = "";
-        if (currentBranch === 'rajkot') {
-          actionBtn = `<button class="btn-cancel" onclick="adminDelete('${t.id}')">Delete</button>`;
+        if (userRole === 'admin') {
+          actionBtn = `<button class="btn-cancel" onclick="adminDelete('${t.id}')">Admin Delete</button>`;
         } else {
-          actionBtn = `<button class="btn-req" onclick="requestCancel('${t.id}')">Request Cancel</button>`;
+          actionBtn = t.cancelReq 
+            ? `<span style="color:#f59e0b; font-size:11px;">Cancel Pending</span>`
+            : `<button class="btn-req" onclick="requestCancel('${t.id}')">Request Cancel</button>`;
         }
         tbody.innerHTML += `<tr>
           <td>${t.client}</td>
@@ -238,40 +424,97 @@
       });
     }
 
-    function loadBills() {
+    function renderMasterPool() {
+      const tbody = document.getElementById('masterPoolBody');
+      tbody.innerHTML = `
+        <tr>
+          <td><b>RELIANCE</b></td>
+          <td>350</td>
+          <td>0</td>
+          <td class="green">+350 (LONG)</td>
+          <td class="green">+₹1,250.00</td>
+        </tr>
+        <tr>
+          <td><b>TATASTEEL</b></td>
+          <td>500</td>
+          <td>0</td>
+          <td class="green">+500 (LONG)</td>
+          <td class="green">+₹2,500.00</td>
+        </tr>
+      `;
+    }
+
+    function renderBills() {
       const tbody = document.getElementById('billsBody');
       tbody.innerHTML = "";
-      clients.filter(c => currentBranch === 'rajkot' || c.branch === currentBranch).forEach(c => {
-        const msg = encodeURIComponent(`*શુક્રવાર MTM બિલ*\nક્લાયન્ટ: ${c.name} (${c.id})\nચૂકવવાપાત્ર આખરી બેલેન્સ: ₹${c.bal.toFixed(2)}\n(કૃપા કરીને હિસાબ ચકાસી લેવો)`);
+      clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
+        const msg = encodeURIComponent(`*શુક્રવાર MTM હિસાબ બિલ*\nક્લાયન્ટ: ${c.name} (${c.id})\nચૂકવવાપાત્ર આખરી બેલેન્સ: ₹${c.bal.toFixed(2)}`);
         const waLink = `https://wa.me/91${c.phone}?text=${msg}`;
         tbody.innerHTML += `<tr>
           <td>${c.name}</td>
           <td class="${c.bal>=0?'green':'red'}">₹${c.bal.toFixed(2)}</td>
-          <td><a href="${waLink}" class="btn-wa" target="_blank">📲 Send</a></td>
+          <td><a href="${waLink}" class="btn-wa" target="_blank">📲 WhatsApp</a></td>
         </tr>`;
       });
     }
 
+    // ૬. એડમિન મેનેજમેન્ટ
+    function addNewClient() {
+      const id = document.getElementById('newClientId').value.trim();
+      const name = document.getElementById('newClientName').value.trim();
+      const mobile = document.getElementById('newClientMobile').value.trim();
+      const branch = document.getElementById('newClientBranch').value;
+
+      if (!id || !name) return alert("કૃપા કરીને ID અને નામ દાખલ કરો!");
+      clients.push({ id, name, branch, phone: mobile, bal: 0 });
+      alert(`નવો ક્લાયન્ટ ${name} સફળતાપૂર્વક ઉમેરાયો.`);
+      renderClientDropdown();
+      renderBills();
+    }
+
+    function addNewBranch() {
+      const code = document.getElementById('newBranchCode').value.trim();
+      const name = document.getElementById('newBranchName').value.trim();
+      if (!code || !name) return alert("કૃપા કરીને વિગતો ભરો!");
+      alert(`નવી શાખા ${name} (${code}) સફળતાપૂર્વક રજીસ્ટર થઈ ગઈ છે.`);
+    }
+
     function placeOrder(action) {
       const client = document.getElementById('clientSelect').value;
-      const stock = document.getElementById('stockInput').value;
+      const stock = document.getElementById('stockSearch').value;
       const qty = document.getElementById('qtyInput').value;
       const price = document.getElementById('priceInput').value;
       if (!stock) return alert("કૃપા કરીને સ્ટોક પસંદ કરો!");
-      alert(`ઓર્ડર સેવ થયો:\nક્લાયન્ટ: ${client}\nસ્ટોક: ${stock}\n${action} Qty: ${qty} @ ₹${price}`);
+      trades.push({
+        id: "TR_" + new Date().getTime(),
+        client: client,
+        branch: userRole === 'admin' ? 'rajkot' : 'surat',
+        stock: stock,
+        action: action,
+        qty: qty
+      });
+      alert(`સોદો પંચ થયો: ${stock} (${qty}) @ ₹${price}`);
+      renderTrades();
     }
 
     function adminDelete(id) {
-      const pin = prompt("સોદો રદ કરવા માટે રાજકોટ Master Admin PIN નાખો:");
-      if (pin === "1234") {
-        alert(`${id} સોદો રદ થયો અને બ્રોકરેજ રિવર્સ થઈ.`);
+      const pin = prompt("સોદો રદ કરવા માટે રાજકોટ Master PIN નાખો:");
+      if (pin === "9999") {
+        trades = trades.filter(t => t.id !== id);
+        alert("સોદો રદ થયો અને બ્રોકરેજ રિવર્સ થઈ.");
+        renderTrades();
       } else if (pin !== null) {
-        alert("ખોટો પિન!");
+        alert("ખોટો PIN!");
       }
     }
 
     function requestCancel(id) {
-      alert(`${id} સોદો રદ કરવા મુખ્ય બ્રાન્ચ રાજકોટને વિનંતી મોકલાઈ ગઈ છે.`);
+      const t = trades.find(x => x.id === id);
+      if (t) {
+        t.cancelReq = true;
+        alert("રદ કરવાની વિનંતી મુખ્ય બ્રાન્ચ રાજકોટને મોકલાઈ ગઈ છે.");
+        renderTrades();
+      }
     }
   </script>
 </body>
