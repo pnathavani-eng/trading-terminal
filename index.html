@@ -62,6 +62,7 @@
     th { color: var(--muted); font-size: 11px; }
     .green { color: var(--green); font-weight: bold; }
     .red { color: var(--red); font-weight: bold; }
+    .timestamp-text { font-size: 10px; color: var(--muted); display: block; margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -136,13 +137,14 @@
       </div>
     </div>
 
+    <!-- Active Positions with Exact Time -->
     <div class="card">
       <div class="card-title">Active Positions</div>
       <table>
         <thead>
           <tr>
             <th>Client</th>
-            <th>Contract</th>
+            <th>Contract & Execution Time</th>
             <th>Side</th>
             <th>Qty</th>
             <th>Action</th>
@@ -175,16 +177,19 @@
     </div>
   </div>
 
-  <!-- TAB 3: Weekly Billing & Direct File Share -->
+  <!-- TAB 3: Weekly Billing with Specific Week Filter (Mon to Fri) -->
   <div id="billingTab" class="tab-content" style="display:none;">
     <div class="card">
-      <div class="card-title">Friday MTM Statements (Direct File Send)</div>
+      <div class="card-title">
+        <span>Friday Settlement Statements</span>
+        <small id="weekRangeDisplay" style="color:var(--muted); font-size:11px;"></small>
+      </div>
       <table>
         <thead>
           <tr>
             <th>Client</th>
             <th>Closing Bal</th>
-            <th>Send Statement File</th>
+            <th>Send 1-Week File</th>
           </tr>
         </thead>
         <tbody id="billsBody"></tbody>
@@ -192,7 +197,7 @@
     </div>
   </div>
 
-  <!-- TAB 4: Client Management (With Edit & Update) -->
+  <!-- TAB 4: Client Management -->
   <div id="manageTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title" id="manageTitle">➕ Add / Edit Client</div>
@@ -269,6 +274,30 @@
     let selectedExpiryType = 'CURRENT';
     let currentRawStock = 'RELIANCE';
     let isEditingClientId = null;
+
+    // Current Week Bounds (Monday to Friday)
+    function getCurrentWeekRange() {
+      const now = new Date();
+      const currentDay = now.getDay(); // 0 is Sun, 1 is Mon...
+      const distanceToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
+      
+      const monday = new Date(now);
+      monday.setDate(now.getDate() + distanceToMonday);
+      monday.setHours(0, 0, 0, 0);
+
+      const friday = new Date(monday);
+      friday.setDate(monday.getDate() + 4);
+      friday.setHours(23, 59, 59, 999);
+
+      const formatDate = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      return {
+        start: monday,
+        end: friday,
+        label: `${formatDate(monday)} to ${formatDate(friday)}`
+      };
+    }
+
+    const currentWeek = getCurrentWeekRange();
 
     function getNseExpiry(offsetMonths = 0) {
       const now = new Date();
@@ -437,6 +466,7 @@
     function initApp() {
       document.getElementById('expCurrent').innerText = `${currentExp.formatted} (Cur)`;
       document.getElementById('expNext').innerText = `${nextExp.formatted} (Next)`;
+      document.getElementById('weekRangeDisplay').innerText = `Period: ${currentWeek.label}`;
 
       if (userRole === 'sub_surat') {
         document.getElementById('branchBadge').innerText = "BRANCH: SURAT (Nareshbhai)";
@@ -555,6 +585,7 @@
       });
     }
 
+    // Active Positions Display with Exact Execution Time
     function renderTrades() {
       const tbody = document.getElementById('tradesBody');
       tbody.innerHTML = "";
@@ -574,7 +605,10 @@
         
         tbody.innerHTML += `<tr>
           <td><b>${t.clientId}</b> - ${t.clientName}</td>
-          <td><b>${t.contract}</b></td>
+          <td>
+            <b>${t.contract}</b>
+            <span class="timestamp-text">⏱️ ${t.timestamp}</span>
+          </td>
           <td class="${t.action==='BUY'?'green':'red'}">${t.action}</td>
           <td>${t.qty}</td>
           <td>${actionBtn}</td>
@@ -595,35 +629,61 @@
       `;
     }
 
-    // Direct Statement File Generator (CSV / Excel format sent via WhatsApp / Native Share)
+    // Filter trades strictly within the active trading week (Monday to Friday)
+    function getClientWeeklyTrades(clientId) {
+      return trades.filter(t => {
+        if (t.clientId !== clientId) return false;
+        const tradeDate = new Date(t.isoDate || Date.now());
+        return tradeDate >= currentWeek.start && tradeDate <= currentWeek.end;
+      });
+    }
+
+    // Direct Statement File Generator (Only 1-Week Trades with Exact Time)
     function shareClientFile(clientId) {
       const client = clients.find(c => c.id === clientId);
       if (!client) return;
-      const clientTrades = trades.filter(t => t.clientId === clientId);
       
-      let csv = "NSE F&O Weekly Statement - " + client.name + " (" + client.id + ")\r\n";
-      csv += "Trade ID,Contract,Side,Quantity,Price,Brokerage\r\n";
-      clientTrades.forEach(t => {
-        csv += `${t.id},${t.contract},${t.action},${t.qty},${t.price},${(t.brokerage||0).toFixed(2)}\r\n`;
+      const weeklyTrades = getClientWeeklyTrades(clientId);
+      
+      let csv = "NSE F&O WEEKLY SETTLEMENT STATEMENT\r\n";
+      csv += `Client Name: ${client.name} (${client.id})\r\n`;
+      csv += `Settlement Period: ${currentWeek.label}\r\n`;
+      csv += `Brokerage Rate: ${client.rate}%\r\n`;
+      csv += "--------------------------------------------------------\r\n";
+      csv += "Execution Time,Trade ID,Contract,Side,Qty,Price,Brokerage\r\n";
+      
+      let totalBrok = 0;
+      weeklyTrades.forEach(t => {
+        const brok = t.brokerage || 0;
+        totalBrok += brok;
+        csv += `"${t.timestamp}",${t.id},"${t.contract}",${t.action},${t.qty},${t.price.toFixed(2)},${brok.toFixed(2)}\r\n`;
       });
-      csv += `\r\nClosing Balance,₹${client.bal.toFixed(2)},Brokerage Rate,${client.rate}%\r\n`;
+      
+      if (weeklyTrades.length === 0) {
+        csv += "No trades executed during this weekly cycle\r\n";
+      }
+
+      csv += "--------------------------------------------------------\r\n";
+      csv += `Total Weekly Trades: ${weeklyTrades.length}\r\n`;
+      csv += `Total Brokerage: ₹${totalBrok.toFixed(2)}\r\n`;
+      csv += `Closing Balance / Net Payable: ₹${client.bal.toFixed(2)}\r\n`;
 
       const blob = new Blob([csv], { type: 'text/csv' });
-      const file = new File([blob], `Statement_${client.id}_${client.name}.csv`, { type: 'text/csv' });
+      const filename = `Statement_${client.id}_${client.name}_Week.csv`;
+      const file = new File([blob], filename, { type: 'text/csv' });
 
-      // iPhone Native Share Sheet -> Select WhatsApp -> Sends Actual File!
+      // iPhone Native Share Sheet -> Select WhatsApp -> Sends Exact CSV/Excel File directly!
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         navigator.share({
           files: [file],
-          title: `Statement ${client.name}`,
-          text: `F&O Statement for ${client.name} (${client.id})`
+          title: `Weekly Statement - ${client.name}`,
+          text: `NSE F&O Statement (${currentWeek.label})`
         }).catch(() => {});
       } else {
-        // Fallback: Direct Download File
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Statement_${client.id}_${client.name}.csv`;
+        a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -637,7 +697,7 @@
           <td><b>${c.id}</b> - ${c.name}</td>
           <td class="${c.bal>=0?'green':'red'}">₹${c.bal.toFixed(2)}</td>
           <td>
-            <button class="btn-share" onclick="shareClientFile('${c.id}')">📎 Send Statement (File)</button>
+            <button class="btn-share" onclick="shareClientFile('${c.id}')">📎 Send 1-Week File</button>
           </td>
         </tr>`;
       });
@@ -659,7 +719,6 @@
       });
     }
 
-    // Edit Client Details (Keeps exact ID without changing it)
     function startEditClient(id) {
       const client = clients.find(c => c.id === id);
       if (!client) return;
@@ -697,7 +756,6 @@
       if (!name) return alert("Please enter Client Name!");
 
       if (isEditingClientId) {
-        // Update existing client
         const idx = clients.findIndex(c => c.id === isEditingClientId);
         if (idx !== -1) {
           clients[idx].name = name;
@@ -708,7 +766,6 @@
         alert(`Client ${id} updated successfully!`);
         cancelEdit();
       } else {
-        // Add new client
         clients.push({ id, name, branch, phone: mobile, rate: rate, bal: 0 });
         alert(`Client ${name} registered under ${id} successfully!`);
         document.getElementById('newClientName').value = '';
@@ -734,6 +791,7 @@
       }
     }
 
+    // Place Order: Automatic Time Tracking (Exact HH:mm:ss)
     function placeOrder(action) {
       const selectedId = document.getElementById('clientSelect').value;
       const clientObj = clients.find(c => c.id === selectedId);
@@ -744,11 +802,15 @@
       const price = parseFloat(document.getElementById('priceInput').value) || 0;
       if (!contract) return alert("Please select a stock!");
 
+      const now = new Date();
+      // Format: DD/MM/YYYY HH:mm:ss
+      const formattedTimestamp = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${now.toLocaleTimeString()}`;
+
       const turnover = qty * price;
       const brokerage = turnover * (clientObj.rate / 100);
 
       trades.push({
-        id: "TR_" + new Date().getTime(),
+        id: "TR_" + now.getTime(),
         clientId: clientObj.id,
         clientName: clientObj.name,
         branch: clientObj.branch,
@@ -756,11 +818,13 @@
         action: action,
         qty: qty,
         price: price,
-        brokerage: brokerage
+        brokerage: brokerage,
+        timestamp: formattedTimestamp,
+        isoDate: now.toISOString()
       });
 
       localStorage.setItem('app_trades_clean', JSON.stringify(trades));
-      alert(`Order Placed Successfully:\nClient: ${clientObj.id} - ${clientObj.name}\nContract: ${contract}\nQuantity: ${qty} @ ₹${price}`);
+      alert(`Order Executed & Logged:\nTime: ${formattedTimestamp}\nClient: ${clientObj.id} - ${clientObj.name}\nContract: ${contract}\nQty: ${qty} @ ₹${price}`);
       renderTrades();
       renderBills();
     }
