@@ -53,9 +53,9 @@
     .btn-sell { background: var(--red); color: #fff; }
     .btn-primary { background: var(--blue); color: #fff; margin-top: 8px; }
     .btn-cancel { background: #b91c1c; color: #fff; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; }
+    .btn-edit { background: #0284c7; color: #fff; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; margin-right: 4px; }
     .btn-req { background: #d97706; color: #fff; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; }
-    .btn-wa { background: #25d366; color: #000; padding: 5px 8px; font-size: 11px; border-radius: 4px; text-decoration: none; font-weight: bold; }
-    .btn-action { background: #047857; color: #fff; padding: 5px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
+    .btn-share { background: #25d366; color: #000; padding: 6px 10px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
     
     table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
     th, td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--border); }
@@ -92,7 +92,7 @@
   <div class="nav-tabs">
     <button class="tab-btn active" onclick="switchTab('terminalTab')">📈 Trading Terminal</button>
     <button class="tab-btn" id="btnAdminPool" onclick="switchTab('poolTab')">🏛️ Master Pool</button>
-    <button class="tab-btn" onclick="switchTab('billingTab')">🧾 Weekly Billing & Reports</button>
+    <button class="tab-btn" onclick="switchTab('billingTab')">🧾 Weekly Statements</button>
     <button class="tab-btn" id="btnManage" onclick="switchTab('manageTab')">👥 Clients Manager</button>
     <button class="tab-btn" id="btnSettings" onclick="switchTab('settingsTab')">⚙️ PIN Settings</button>
   </div>
@@ -109,7 +109,7 @@
 
         <div class="full-width search-container">
           <label>F&O Stock (216 NSE Contracts)</label>
-          <input type="text" id="stockSearch" placeholder="Type stock name (e.g. RELIANCE, TATA, HDFC)" oninput="filterStocks()" autocomplete="off">
+          <input type="text" id="stockSearch" placeholder="Type stock name" oninput="filterStocks()" autocomplete="off">
           <div id="searchResults" class="search-results"></div>
         </div>
 
@@ -175,16 +175,16 @@
     </div>
   </div>
 
-  <!-- TAB 3: Weekly Billing & Detailed Statements -->
+  <!-- TAB 3: Weekly Billing & Direct File Share -->
   <div id="billingTab" class="tab-content" style="display:none;">
     <div class="card">
-      <div class="card-title">Friday MTM Statements (WhatsApp & Downloads)</div>
+      <div class="card-title">Friday MTM Statements (Direct File Send)</div>
       <table>
         <thead>
           <tr>
             <th>Client</th>
             <th>Closing Bal</th>
-            <th>Actions</th>
+            <th>Send Statement File</th>
           </tr>
         </thead>
         <tbody id="billsBody"></tbody>
@@ -192,10 +192,10 @@
     </div>
   </div>
 
-  <!-- TAB 4: Client Management -->
+  <!-- TAB 4: Client Management (With Edit & Update) -->
   <div id="manageTab" class="tab-content" style="display:none;">
     <div class="card">
-      <div class="card-title" id="manageTitle">➕ Add New Client</div>
+      <div class="card-title" id="manageTitle">➕ Add / Edit Client</div>
       <div class="form-grid">
         <div id="branchField">
           <label>Branch / Sub-Broker</label>
@@ -205,7 +205,7 @@
           </select>
         </div>
         <div>
-          <label>Client Code (Auto Assigned)</label>
+          <label>Client Code</label>
           <input type="text" id="newClientId" readonly>
         </div>
         <div>
@@ -221,7 +221,10 @@
           <input type="number" id="newClientRate" value="0.01" step="0.005">
         </div>
       </div>
-      <button class="btn btn-primary" onclick="addNewClient()">Save Client</button>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-primary" id="saveClientBtn" onclick="saveClient()">Save Client</button>
+        <button class="btn" id="cancelEditBtn" style="background:#475569; display:none;" onclick="cancelEdit()">Cancel</button>
+      </div>
     </div>
 
     <div class="card">
@@ -231,7 +234,6 @@
           <tr>
             <th>ID</th>
             <th>Name</th>
-            <th>Branch</th>
             <th>Rate</th>
             <th>Action</th>
           </tr>
@@ -266,8 +268,8 @@
     let userRole = null;
     let selectedExpiryType = 'CURRENT';
     let currentRawStock = 'RELIANCE';
+    let isEditingClientId = null;
 
-    // Auto NSE Last Thursday Expiry Generator
     function getNseExpiry(offsetMonths = 0) {
       const now = new Date();
       let targetYear = now.getFullYear();
@@ -291,7 +293,6 @@
     let currentExp = getNseExpiry(0);
     let nextExp = getNseExpiry(1);
 
-    // FULL 216 NSE F&O STOCKS
     const fnoDatabase = [
       { name: "AARTIIND", lot: 1000, price: 480.0 }, { name: "ABB", lot: 125, price: 7850.0 },
       { name: "ABBOTINDIA", lot: 40, price: 28500.0 }, { name: "ABCAPITAL", lot: 3100, price: 215.0 },
@@ -403,8 +404,7 @@
       { name: "ZOMATO", lot: 2425, price: 260.0 }, { name: "ZYDUSLIFE", lot: 900, price: 1050.0 }
     ];
 
-    // Standardized Clean Data Storage
-    let clients = JSON.parse(localStorage.getItem('app_clients_v2')) || [
+    let clients = JSON.parse(localStorage.getItem('app_clients_clean')) || [
       { id: "R1", name: "Rameshbhai", branch: "rajkot", phone: "9825012345", rate: 0.01, bal: -12.50 },
       { id: "R2", name: "Kishorbhai", branch: "rajkot", phone: "9898012345", rate: 0.02, bal: 0.00 },
       { id: "N1", name: "Bhaveshbhai", branch: "surat", phone: "9825111111", rate: 0.01, bal: 1025.00 },
@@ -412,11 +412,7 @@
       { id: "N3", name: "Piyush Nathavani", branch: "surat", phone: "9825333333", rate: 0.01, bal: 0.00 }
     ];
 
-    let trades = JSON.parse(localStorage.getItem('app_trades_v2')) || [
-      { id: "TR_1001", clientId: "R1", clientName: "Rameshbhai", branch: "rajkot", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 100, price: 1175.00, brokerage: 11.75 },
-      { id: "TR_1002", clientId: "N1", clientName: "Bhaveshbhai", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 50, price: 1175.00, brokerage: 5.88 },
-      { id: "TR_1003", clientId: "N2", clientName: "Hiteshbhai", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 200, price: 1175.00, brokerage: 23.50 }
-    ];
+    let trades = JSON.parse(localStorage.getItem('app_trades_clean')) || [];
 
     function verifyLogin() {
       const pin = document.getElementById('pinInput').value;
@@ -449,7 +445,7 @@
         document.getElementById('btnAdminPool').style.display = 'none';
         document.getElementById('branchField').style.display = 'none';
         document.getElementById('adminPinField').style.display = 'none';
-        document.getElementById('manageTitle').innerText = "➕ Add Client (Surat Branch - 'N' Series)";
+        document.getElementById('manageTitle').innerText = "➕ Add / Edit Client (Surat)";
       } else {
         document.getElementById('branchBadge').innerText = "HO: RAJKOT";
         document.getElementById('branchBadge').className = "branch-badge admin-badge";
@@ -457,7 +453,7 @@
         document.getElementById('btnAdminPool').style.display = 'block';
         document.getElementById('branchField').style.display = 'block';
         document.getElementById('adminPinField').style.display = 'block';
-        document.getElementById('manageTitle').innerText = "➕ Add New Client";
+        document.getElementById('manageTitle').innerText = "➕ Add / Edit Client";
       }
 
       autoGenerateClientId();
@@ -470,6 +466,7 @@
     }
 
     function autoGenerateClientId() {
+      if (isEditingClientId) return;
       const branch = userRole === 'admin' ? document.getElementById('newClientBranch').value : 'surat';
       const prefix = branch === 'rajkot' ? 'R' : 'N';
       
@@ -482,11 +479,8 @@
       
       let candidate = 1;
       for (let n of numbers) {
-        if (n === candidate) {
-          candidate++;
-        } else if (n > candidate) {
-          break;
-        }
+        if (n === candidate) candidate++;
+        else if (n > candidate) break;
       }
       document.getElementById('newClientId').value = `${prefix}${candidate}`;
     }
@@ -561,14 +555,13 @@
       });
     }
 
-    // Active Positions Display
     function renderTrades() {
       const tbody = document.getElementById('tradesBody');
       tbody.innerHTML = "";
       const filtered = trades.filter(t => userRole === 'admin' || t.branch === 'surat');
       
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--muted); padding:14px;">No active trades placed yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--muted); padding:14px;">No active trades placed.</td></tr>`;
         return;
       }
 
@@ -602,130 +595,52 @@
       `;
     }
 
-    // Friday MTM Statements with Trade-by-Trade Breakdown & Exports
+    // Direct Statement File Generator (CSV / Excel format sent via WhatsApp / Native Share)
+    function shareClientFile(clientId) {
+      const client = clients.find(c => c.id === clientId);
+      if (!client) return;
+      const clientTrades = trades.filter(t => t.clientId === clientId);
+      
+      let csv = "NSE F&O Weekly Statement - " + client.name + " (" + client.id + ")\r\n";
+      csv += "Trade ID,Contract,Side,Quantity,Price,Brokerage\r\n";
+      clientTrades.forEach(t => {
+        csv += `${t.id},${t.contract},${t.action},${t.qty},${t.price},${(t.brokerage||0).toFixed(2)}\r\n`;
+      });
+      csv += `\r\nClosing Balance,₹${client.bal.toFixed(2)},Brokerage Rate,${client.rate}%\r\n`;
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const file = new File([blob], `Statement_${client.id}_${client.name}.csv`, { type: 'text/csv' });
+
+      // iPhone Native Share Sheet -> Select WhatsApp -> Sends Actual File!
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          files: [file],
+          title: `Statement ${client.name}`,
+          text: `F&O Statement for ${client.name} (${client.id})`
+        }).catch(() => {});
+      } else {
+        // Fallback: Direct Download File
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Statement_${client.id}_${client.name}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    }
+
     function renderBills() {
       const tbody = document.getElementById('billsBody');
       tbody.innerHTML = "";
       clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
-        const clientTrades = trades.filter(t => t.clientId === c.id);
-        let tradeDetailsText = "";
-        let totalTurnover = 0;
-        let totalBrokerage = 0;
-
-        clientTrades.forEach((tr, idx) => {
-          const val = tr.qty * tr.price;
-          totalTurnover += val;
-          totalBrokerage += tr.brokerage || (val * (c.rate / 100));
-          tradeDetailsText += `\n${idx+1}. ${tr.contract} | ${tr.action} ${tr.qty} @ ₹${tr.price.toFixed(2)} (Brokerage: ₹${(tr.brokerage||0).toFixed(2)})`;
-        });
-
-        if (clientTrades.length === 0) {
-          tradeDetailsText = "\n(No active trades executed this week)";
-        }
-
-        const fullMsg = `*NSE F&O WEEKLY SETTLEMENT STATEMENT*
-Client: ${c.name} (${c.id})
-Branch: ${c.branch.toUpperCase()}
-Brokerage Rate: ${c.rate}%
-Date: Friday Settlement
---------------------------------------
-*WEEKLY TRADES BREAKDOWN:*${tradeDetailsText}
---------------------------------------
-Total Weekly Trades: ${clientTrades.length}
-Total Est. Turnover: ₹${totalTurnover.toLocaleString('en-IN', {minimumFractionDigits: 2})}
-Total Brokerage Charged: ₹${totalBrokerage.toFixed(2)}
-Net MTM / Closing Balance: ₹${c.bal.toFixed(2)}
---------------------------------------
-Status: Official Weekly Ledger Statement.`;
-
-        const waLink = `https://wa.me/91${c.phone}?text=${encodeURIComponent(fullMsg)}`;
-        
         tbody.innerHTML += `<tr>
           <td><b>${c.id}</b> - ${c.name}</td>
           <td class="${c.bal>=0?'green':'red'}">₹${c.bal.toFixed(2)}</td>
-          <td style="display:flex; gap:4px; flex-wrap:wrap;">
-            <a href="${waLink}" class="btn-wa" target="_blank">📲 WhatsApp</a>
-            <button class="btn-action" onclick="exportClientExcel('${c.id}')">📥 Excel</button>
-            <button class="btn-action" style="background:#475569;" onclick="printClientPDF('${c.id}')">🖨️ PDF</button>
+          <td>
+            <button class="btn-share" onclick="shareClientFile('${c.id}')">📎 Send Statement (File)</button>
           </td>
         </tr>`;
       });
-    }
-
-    // Export Client Detailed Weekly Bill as CSV/Excel File
-    function exportClientExcel(clientId) {
-      const client = clients.find(c => c.id === clientId);
-      if (!client) return;
-      const clientTrades = trades.filter(t => t.clientId === clientId);
-      
-      let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "NSE F&O Weekly Statement - " + client.name + " (" + client.id + ")\r\n";
-      csvContent += "Trade ID,Contract,Action,Quantity,Execution Price,Turnover,Brokerage\r\n";
-      
-      clientTrades.forEach(t => {
-        const turnover = t.qty * t.price;
-        const brok = t.brokerage || (turnover * (client.rate / 100));
-        csvContent += `${t.id},${t.contract},${t.action},${t.qty},${t.price},${turnover.toFixed(2)},${brok.toFixed(2)}\r\n`;
-      });
-
-      csvContent += `\r\nSummary,Closing Balance: ₹${client.bal.toFixed(2)},Brokerage Rate: ${client.rate}%\r\n`;
-
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Statement_${client.id}_${client.name}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    // Print / Save Client Statement as PDF
-    function printClientPDF(clientId) {
-      const client = clients.find(c => c.id === clientId);
-      if (!client) return;
-      const clientTrades = trades.filter(t => t.clientId === clientId);
-
-      let tradesHtml = "";
-      clientTrades.forEach(t => {
-        tradesHtml += `<tr>
-          <td style="border:1px solid #ddd; padding:8px;">${t.id}</td>
-          <td style="border:1px solid #ddd; padding:8px;">${t.contract}</td>
-          <td style="border:1px solid #ddd; padding:8px;">${t.action}</td>
-          <td style="border:1px solid #ddd; padding:8px;">${t.qty}</td>
-          <td style="border:1px solid #ddd; padding:8px;">₹${t.price}</td>
-          <td style="border:1px solid #ddd; padding:8px;">₹${(t.brokerage||0).toFixed(2)}</td>
-        </tr>`;
-      });
-
-      const win = window.open('', '', 'height=600,width=800');
-      win.document.write(`
-        <html>
-        <head><title>Statement - ${client.name}</title></head>
-        <body style="font-family:sans-serif; padding:20px;">
-          <h2>NSE F&O Weekly Settlement Statement</h2>
-          <p><b>Client:</b> ${client.name} (${client.id}) | <b>Branch:</b> ${client.branch.toUpperCase()}</p>
-          <p><b>Brokerage Rate:</b> ${client.rate}% | <b>Closing Balance:</b> ₹${client.bal.toFixed(2)}</p>
-          <hr>
-          <h3>Weekly Trades</h3>
-          <table style="width:100%; border-collapse:collapse;">
-            <thead>
-              <tr style="background:#f2f2f2;">
-                <th style="border:1px solid #ddd; padding:8px;">Trade ID</th>
-                <th style="border:1px solid #ddd; padding:8px;">Contract</th>
-                <th style="border:1px solid #ddd; padding:8px;">Side</th>
-                <th style="border:1px solid #ddd; padding:8px;">Qty</th>
-                <th style="border:1px solid #ddd; padding:8px;">Price</th>
-                <th style="border:1px solid #ddd; padding:8px;">Brokerage</th>
-              </tr>
-            </thead>
-            <tbody>${tradesHtml || '<tr><td colspan="6" style="padding:10px; text-align:center;">No trades</td></tr>'}</tbody>
-          </table>
-          <br>
-          <button onclick="window.print()" style="padding:10px 15px; font-weight:bold; cursor:pointer;">Print / Save as PDF</button>
-        </body>
-        </html>
-      `);
-      win.document.close();
     }
 
     function renderClientsList() {
@@ -735,25 +650,44 @@ Status: Official Weekly Ledger Statement.`;
         tbody.innerHTML += `<tr>
           <td><b>${c.id}</b></td>
           <td>${c.name}</td>
-          <td>${c.branch.toUpperCase()}</td>
           <td>${c.rate}%</td>
-          <td><button class="btn-cancel" onclick="removeClient('${c.id}')">Exit / Remove</button></td>
+          <td>
+            <button class="btn-edit" onclick="startEditClient('${c.id}')">Edit</button>
+            <button class="btn-cancel" onclick="removeClient('${c.id}')">Exit</button>
+          </td>
         </tr>`;
       });
     }
 
-    function removeClient(id) {
-      if (confirm(`Remove client ${id}? Their ID will be recycled for the next new client.`)) {
-        clients = clients.filter(c => c.id !== id);
-        localStorage.setItem('app_clients_v2', JSON.stringify(clients));
-        renderClients();
-        renderClientsList();
-        renderBills();
-        autoGenerateClientId();
+    // Edit Client Details (Keeps exact ID without changing it)
+    function startEditClient(id) {
+      const client = clients.find(c => c.id === id);
+      if (!client) return;
+      isEditingClientId = id;
+      
+      document.getElementById('newClientId').value = client.id;
+      document.getElementById('newClientName').value = client.name;
+      document.getElementById('newClientMobile').value = client.phone;
+      document.getElementById('newClientRate').value = client.rate;
+      if (userRole === 'admin') {
+        document.getElementById('newClientBranch').value = client.branch;
       }
+      
+      document.getElementById('saveClientBtn').innerText = "Update Client";
+      document.getElementById('cancelEditBtn').style.display = "inline-block";
+      switchTab('manageTab');
     }
 
-    function addNewClient() {
+    function cancelEdit() {
+      isEditingClientId = null;
+      document.getElementById('newClientName').value = '';
+      document.getElementById('newClientMobile').value = '';
+      document.getElementById('saveClientBtn').innerText = "Save Client";
+      document.getElementById('cancelEditBtn').style.display = "none";
+      autoGenerateClientId();
+    }
+
+    function saveClient() {
       const id = document.getElementById('newClientId').value.trim();
       const name = document.getElementById('newClientName').value.trim();
       const mobile = document.getElementById('newClientMobile').value.trim();
@@ -761,37 +695,45 @@ Status: Official Weekly Ledger Statement.`;
       const branch = userRole === 'admin' ? document.getElementById('newClientBranch').value : 'surat';
 
       if (!name) return alert("Please enter Client Name!");
-      clients.push({ id, name, branch, phone: mobile, rate: rate, bal: 0 });
-      localStorage.setItem('app_clients_v2', JSON.stringify(clients));
-      
-      alert(`Client ${name} registered under ${id} successfully!`);
-      
-      document.getElementById('newClientName').value = '';
-      document.getElementById('newClientMobile').value = '';
-      
-      autoGenerateClientId();
+
+      if (isEditingClientId) {
+        // Update existing client
+        const idx = clients.findIndex(c => c.id === isEditingClientId);
+        if (idx !== -1) {
+          clients[idx].name = name;
+          clients[idx].phone = mobile;
+          clients[idx].rate = rate;
+          clients[idx].branch = branch;
+        }
+        alert(`Client ${id} updated successfully!`);
+        cancelEdit();
+      } else {
+        // Add new client
+        clients.push({ id, name, branch, phone: mobile, rate: rate, bal: 0 });
+        alert(`Client ${name} registered under ${id} successfully!`);
+        document.getElementById('newClientName').value = '';
+        document.getElementById('newClientMobile').value = '';
+        autoGenerateClientId();
+      }
+
+      localStorage.setItem('app_clients_clean', JSON.stringify(clients));
       renderClients();
       renderClientsList();
       renderBills();
       switchTab('terminalTab');
     }
 
-    function saveNewPins() {
-      const newAdm = document.getElementById('newAdminPin').value.trim();
-      const newSrt = document.getElementById('newSuratPin').value.trim();
-      
-      if (userRole === 'admin' && newAdm) {
-        adminPin = newAdm;
-        localStorage.setItem('app_admin_pin', newAdm);
+    function removeClient(id) {
+      if (confirm(`Remove client ${id}? Their ID will be recycled.`)) {
+        clients = clients.filter(c => c.id !== id);
+        localStorage.setItem('app_clients_clean', JSON.stringify(clients));
+        renderClients();
+        renderClientsList();
+        renderBills();
+        autoGenerateClientId();
       }
-      if (newSrt) {
-        suratPin = newSrt;
-        localStorage.setItem('app_surat_pin', newSrt);
-      }
-      alert("Security PINs updated successfully!");
     }
 
-    // Place Order: Perfect ID, Name & Storage Guarantee
     function placeOrder(action) {
       const selectedId = document.getElementById('clientSelect').value;
       const clientObj = clients.find(c => c.id === selectedId);
@@ -817,7 +759,7 @@ Status: Official Weekly Ledger Statement.`;
         brokerage: brokerage
       });
 
-      localStorage.setItem('app_trades_v2', JSON.stringify(trades));
+      localStorage.setItem('app_trades_clean', JSON.stringify(trades));
       alert(`Order Placed Successfully:\nClient: ${clientObj.id} - ${clientObj.name}\nContract: ${contract}\nQuantity: ${qty} @ ₹${price}`);
       renderTrades();
       renderBills();
@@ -827,8 +769,8 @@ Status: Official Weekly Ledger Statement.`;
       const pin = prompt("Enter Master PIN to delete trade:");
       if (pin === adminPin) {
         trades = trades.filter(t => t.id !== id);
-        localStorage.setItem('app_trades_v2', JSON.stringify(trades));
-        alert("Trade canceled and brokerage reversed.");
+        localStorage.setItem('app_trades_clean', JSON.stringify(trades));
+        alert("Trade canceled.");
         renderTrades();
         renderBills();
       } else if (pin !== null) {
@@ -840,10 +782,24 @@ Status: Official Weekly Ledger Statement.`;
       const t = trades.find(x => x.id === id);
       if (t) {
         t.cancelReq = true;
-        localStorage.setItem('app_trades_v2', JSON.stringify(trades));
+        localStorage.setItem('app_trades_clean', JSON.stringify(trades));
         alert("Cancellation request sent to Rajkot HO.");
         renderTrades();
       }
+    }
+
+    function saveNewPins() {
+      const newAdm = document.getElementById('newAdminPin').value.trim();
+      const newSrt = document.getElementById('newSuratPin').value.trim();
+      if (userRole === 'admin' && newAdm) {
+        adminPin = newAdm;
+        localStorage.setItem('app_admin_pin', newAdm);
+      }
+      if (newSrt) {
+        suratPin = newSrt;
+        localStorage.setItem('app_surat_pin', newSrt);
+      }
+      alert("Security PINs updated successfully!");
     }
   </script>
 </body>
