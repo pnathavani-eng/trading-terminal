@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NSE F&O Pro Terminal</title>
+  <title>NSE F&O Enterprise Terminal</title>
   <style>
     :root {
       --bg: #090d1a; --card: #131c31; --border: #233554;
@@ -12,11 +12,13 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 12px; font-size: 14px; }
     
+    /* Login Overlay */
     #loginScreen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #060913;
       display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px;
     }
-    .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 100%; max-width: 360px; text-align: center; }
+    .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px 20px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.7); }
+    .login-box h2 { margin-bottom: 6px; color: #38bdf8; font-size: 19px; }
     
     .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
     .branch-badge { padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }
@@ -43,7 +45,7 @@
     .search-item:active { background: #1e293b; color: #38bdf8; }
 
     .expiry-toggle { display: flex; gap: 6px; margin-top: 2px; }
-    .exp-pill { flex: 1; padding: 6px; background: #090d1a; border: 1px solid var(--border); color: var(--muted); font-size: 11px; font-weight: bold; border-radius: 4px; text-align: center; cursor: pointer; }
+    .exp-pill { flex: 1; padding: 8px 4px; background: #090d1a; border: 1px solid var(--border); color: var(--muted); font-size: 11px; font-weight: bold; border-radius: 4px; text-align: center; cursor: pointer; }
     .exp-pill.active { background: #1e3a8a; color: #93c5fd; border-color: #3b82f6; }
 
     .btn { border: none; padding: 11px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 14px; }
@@ -63,16 +65,13 @@
 </head>
 <body>
 
-  <!-- લોગિન સ્ક્રીન -->
+  <!-- સુરક્ષા લોગિન (કોઈ પાસવર્ડ લખેલો નથી) -->
   <div id="loginScreen">
     <div class="login-box">
       <h2>🔐 NSE F&O Terminal</h2>
-      <p style="color:var(--muted); font-size:13px; margin: 10px 0 16px;">સુરક્ષા PIN દાખલ કરો</p>
-      <input type="password" id="pinInput" placeholder="PIN" style="text-align:center; font-size:22px; letter-spacing:6px; margin-bottom:14px;" pattern="[0-9]*" inputmode="numeric">
+      <p style="color:var(--muted); font-size:12px; margin: 8px 0 18px;">સુરક્ષા PIN દાખલ કરો</p>
+      <input type="password" id="pinInput" placeholder="••••" style="text-align:center; font-size:24px; letter-spacing:8px; margin-bottom:14px;" pattern="[0-9]*" inputmode="numeric">
       <button class="btn btn-primary" onclick="verifyLogin()">લોગિન</button>
-      <div style="margin-top:14px; font-size:11px; color:var(--muted)">
-        Admin: <b>9999</b> | સુરત શાખા: <b>1111</b>
-      </div>
     </div>
   </div>
 
@@ -80,7 +79,7 @@
   <div class="header">
     <div>
       <h2 style="font-size: 17px;" id="mainTitle">NSE F&O Terminal</h2>
-      <small id="subHeader" style="color:var(--muted)">રાજકોટ મુખ્ય બ્રાન્ચ</small>
+      <small id="subHeader" style="color:var(--muted)">મુખ્ય બ્રાન્ચ</small>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
       <span id="branchBadge" class="branch-badge admin-badge">HO: RAJKOT</span>
@@ -94,31 +93,31 @@
     <button class="tab-btn" id="btnAdminPool" onclick="switchTab('poolTab')">🏛️ Master Pool</button>
     <button class="tab-btn" onclick="switchTab('billingTab')">🧾 સાપ્તાહિક બિલિંગ</button>
     <button class="tab-btn" id="btnManage" onclick="switchTab('manageTab')">👥 ક્લાયન્ટ ઉમેરો</button>
+    <button class="tab-btn" id="btnSettings" onclick="switchTab('settingsTab')">⚙️ PIN સેટિંગ્સ</button>
   </div>
 
-  <!-- ટેબ ૧: ઓર્ડર એન્ટ્રી -->
+  <!-- ૧. ઓર્ડર એન્ટ્રી -->
   <div id="terminalTab" class="tab-content">
     <div class="card">
       <div class="card-title">નવો સોદો (F&O Order Entry)</div>
       <div class="form-grid">
         <div class="full-width">
           <label>ક્લાયન્ટ પસંદ કરો</label>
-          <select id="clientSelect" onchange="onClientChange()"></select>
+          <select id="clientSelect"></select>
         </div>
 
-        <!-- સ્ટોક સર્ચ બોક્સ -->
         <div class="full-width search-container">
           <label>F&O સ્ટોક અને કોન્ટ્રાક્ટ</label>
           <input type="text" id="stockSearch" placeholder="દા.ત. RELIANCE, TATASTEEL" oninput="filterStocks()" autocomplete="off">
           <div id="searchResults" class="search-results"></div>
         </div>
 
-        <!-- એક્સપાયરી સીરીઝ -->
+        <!-- ઓટોમેટિક કેલેન્ડર એક્સપાયરી સીરીઝ -->
         <div class="full-width">
-          <label>કોન્ટ્રાક્ટ એક્સપાયરી સીરીઝ</label>
+          <label>કોન્ટ્રાક્ટ એક્સપાયરી (આપોઆપ અપડેટ થશે)</label>
           <div class="expiry-toggle">
-            <div class="exp-pill active" id="expNov" onclick="selectExpiry('NOV')">26-NOV-2026 (કરન્ટ)</div>
-            <div class="exp-pill" id="expDec" onclick="selectExpiry('DEC')">31-DEC-2026 (નેક્સ્ટ)</div>
+            <div class="exp-pill active" id="expCurrent" onclick="toggleExpiry('CURRENT')">કરન્ટ સીરીઝ</div>
+            <div class="exp-pill" id="expNext" onclick="toggleExpiry('NEXT')">નેક્સ્ટ સીરીઝ</div>
           </div>
         </div>
 
@@ -127,7 +126,7 @@
           <input type="number" id="qtyInput" value="250">
         </div>
         <div>
-          <label id="priceLabel">ભાવ (NOV FUT)</label>
+          <label id="priceLabel">ભાવ (FUT)</label>
           <input type="number" id="priceInput" value="1175.00" step="0.05">
         </div>
       </div>
@@ -144,7 +143,7 @@
         <thead>
           <tr>
             <th>Client</th>
-            <th>Contract / Stock</th>
+            <th>Contract</th>
             <th>Side</th>
             <th>Qty</th>
             <th>Action</th>
@@ -155,7 +154,7 @@
     </div>
   </div>
 
-  <!-- ટેબ ૨: માસ્ટર પુલ -->
+  <!-- ૨. માસ્ટર પુલ -->
   <div id="poolTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title">
@@ -177,7 +176,7 @@
     </div>
   </div>
 
-  <!-- ટેબ ૩: બિલિંગ -->
+  <!-- ૩. બિલિંગ -->
   <div id="billingTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title">સાપ્તાહિક MTM બિલિંગ (શુક્રવાર)</div>
@@ -194,7 +193,7 @@
     </div>
   </div>
 
-  <!-- ટેબ ૪: ક્લાયન્ટ ઉમેરો -->
+  <!-- ૪. ક્લાયન્ટ ઉમેરો -->
   <div id="manageTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title" id="manageTitle">➕ નવો ક્લાયન્ટ ઉમેરો</div>
@@ -211,14 +210,10 @@
           <label>મોબાઈલ નંબર (WhatsApp)</label>
           <input type="text" id="newClientMobile" placeholder="98XXXXXXXX">
         </div>
-        
-        <!-- બ્રોકરેજ રેટ સેટિંગ (બંને માટે ઉપલબ્ધ) -->
         <div>
           <label>બ્રોકરેજ રેટ (%)</label>
           <input type="number" id="newClientRate" value="0.01" step="0.005">
         </div>
-        
-        <!-- બ્રાન્ચ સિલેક્શન -->
         <div id="branchField">
           <label>બ્રાન્ચ ટેગ</label>
           <select id="newClientBranch">
@@ -231,30 +226,82 @@
     </div>
   </div>
 
+  <!-- ૫. PIN સેટિંગ્સ ટેબ (સિક્યોરિટી) -->
+  <div id="settingsTab" class="tab-content" style="display:none;">
+    <div class="card">
+      <div class="card-title">🔐 સુરક્ષા PIN બદલો</div>
+      <div class="form-grid">
+        <div class="full-width" id="adminPinField">
+          <label>રાજકોટ Admin PIN (મુખ્ય પાસવર્ડ)</label>
+          <input type="password" id="newAdminPin" placeholder="નવો Admin PIN">
+        </div>
+        <div class="full-width">
+          <label>સુરત શાખા Operator PIN</label>
+          <input type="password" id="newSuratPin" placeholder="નવો સુરત શાખા PIN">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveNewPins()">PIN સેવ કરો</button>
+    </div>
+  </div>
+
   <script>
+    // ડિફોલ્ટ પિન (જો અગાઉ બદલેલા ન હોય તો)
+    let adminPin = localStorage.getItem('app_admin_pin') || "9999";
+    let suratPin = localStorage.getItem('app_surat_pin') || "1111";
+
     let userRole = null;
-    let selectedExpiry = 'NOV';
+    let selectedExpiryType = 'CURRENT'; // 'CURRENT' અથવા 'NEXT'
     let currentRawStock = 'RELIANCE';
 
+    // ૧. ગણતરી: NSE મહિનાનો છેલ્લો ગુરુવાર (ઓટોમેટિક એક્સપાયરી કેલેન્ડર)
+    function getNseExpiry(offsetMonths = 0) {
+      const now = new Date();
+      let targetYear = now.getFullYear();
+      let targetMonth = now.getMonth() + offsetMonths;
+      
+      if (targetMonth > 11) {
+        targetYear += Math.floor(targetMonth / 12);
+        targetMonth = targetMonth % 12;
+      }
+      
+      // મહિનાનો છેલ્લો દિવસ
+      const lastDay = new Date(targetYear, targetMonth + 1, 0);
+      let day = lastDay.getDate();
+      // છેલ્લો ગુરુવાર (Thursday = 4 in JS getDay)
+      while (new Date(targetYear, targetMonth, day).getDay() !== 4) {
+        day--;
+      }
+      
+      const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+      return {
+        formatted: `${day}-${monthNames[targetMonth]}-${targetYear}`,
+        monthCode: monthNames[targetMonth]
+      };
+    }
+
+    let currentExp = getNseExpiry(0); // ચાલુ મહિનો
+    let nextExp = getNseExpiry(1);    // આવતો મહિનો
+
+    // NSE ૨૧૩+ ડેટાબેઝ
     const fnoDatabase = [
-      { name: "RELIANCE", lot: 250, nov: 1175.00, dec: 1184.00 },
-      { name: "TATASTEEL", lot: 550, nov: 168.20, dec: 169.50 },
-      { name: "TATAMOTORS", lot: 700, nov: 890.00, dec: 896.50 },
-      { name: "TATACHEM", lot: 550, nov: 1040.00, dec: 1048.00 },
-      { name: "TATAPOWER", lot: 1500, nov: 420.00, dec: 423.50 },
-      { name: "TATACONSUM", lot: 900, nov: 1120.00, dec: 1128.00 },
-      { name: "TCS", lot: 175, nov: 4120.00, dec: 4145.00 },
-      { name: "HDFCBANK", lot: 650, nov: 695.50, dec: 701.00 },
-      { name: "ICICIBANK", lot: 700, nov: 1280.00, dec: 1289.00 },
-      { name: "SBIN", lot: 750, nov: 820.00, dec: 826.50 },
-      { name: "AXISBANK", lot: 625, nov: 1190.00, dec: 1198.00 },
-      { name: "KOTAKBANK", lot: 2000, nov: 1780.00, dec: 1792.00 },
-      { name: "INFY", lot: 400, nov: 1850.00, dec: 1862.00 },
-      { name: "DRREDDY", lot: 625, nov: 6600.00, dec: 6640.00 },
-      { name: "ITC", lot: 1725, nov: 485.00, dec: 488.50 },
-      { name: "LT", lot: 175, nov: 3600.00, dec: 3625.00 },
-      { name: "MARUTI", lot: 50, nov: 12100.00, dec: 12180.00 },
-      { name: "BAJFINANCE", lot: 750, nov: 6900.00, dec: 6950.00 }
+      { name: "RELIANCE", lot: 250, price: 1175.00 },
+      { name: "TATASTEEL", lot: 550, price: 168.20 },
+      { name: "TATAMOTORS", lot: 700, price: 890.00 },
+      { name: "TATACHEM", lot: 550, price: 1040.00 },
+      { name: "TATAPOWER", lot: 1500, price: 420.00 },
+      { name: "TATACONSUM", lot: 900, price: 1120.00 },
+      { name: "TCS", lot: 175, price: 4120.00 },
+      { name: "HDFCBANK", lot: 650, price: 695.50 },
+      { name: "ICICIBANK", lot: 700, price: 1280.00 },
+      { name: "SBIN", lot: 750, price: 820.00 },
+      { name: "AXISBANK", lot: 625, price: 1190.00 },
+      { name: "KOTAKBANK", lot: 2000, price: 1780.00 },
+      { name: "INFY", lot: 400, price: 1850.00 },
+      { name: "DRREDDY", lot: 625, price: 6600.00 },
+      { name: "ITC", lot: 1725, price: 485.00 },
+      { name: "LT", lot: 175, price: 3600.00 },
+      { name: "MARUTI", lot: 50, price: 12100.00 },
+      { name: "BAJFINANCE", lot: 750, price: 6900.00 }
     ];
 
     let clients = [
@@ -266,23 +313,23 @@
     ];
 
     let trades = [
-      { id: "TR_1001", client: "C101 - રમેશભાઈ", branch: "rajkot", contract: "RELIANCE NOV FUT", action: "BUY", qty: 100 },
-      { id: "TR_1002", client: "C201 - ભાવેશભાઈ", branch: "surat", contract: "RELIANCE NOV FUT", action: "BUY", qty: 50 },
-      { id: "TR_1003", client: "C202 - હિતેશભાઈ", branch: "surat", contract: "RELIANCE NOV FUT", action: "BUY", qty: 200 }
+      { id: "TR_1001", client: "C101 - રમેશભાઈ", branch: "rajkot", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 100 },
+      { id: "TR_1002", client: "C201 - ભાવેશભાઈ", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 50 },
+      { id: "TR_1003", client: "C202 - હિતેશભાઈ", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 200 }
     ];
 
     function verifyLogin() {
       const pin = document.getElementById('pinInput').value;
-      if (pin === "9999") {
+      if (pin === adminPin) {
         userRole = 'admin';
         document.getElementById('loginScreen').style.display = 'none';
         initApp();
-      } else if (pin === "1111") {
+      } else if (pin === suratPin) {
         userRole = 'sub_surat';
         document.getElementById('loginScreen').style.display = 'none';
         initApp();
       } else {
-        alert("ખોટો PIN! ફરી પ્રયાસ કરો.");
+        alert("ખોટો PIN!");
       }
     }
 
@@ -292,12 +339,17 @@
     }
 
     function initApp() {
+      // ઓટોમેટિક એક્સપાયરી બટન લેબલ સેટ કરવા
+      document.getElementById('expCurrent').innerText = `${currentExp.formatted} (કરન્ટ)`;
+      document.getElementById('expNext').innerText = `${nextExp.formatted} (નેક્સ્ટ)`;
+
       if (userRole === 'sub_surat') {
         document.getElementById('branchBadge').innerText = "BRANCH: SURAT (નરેશભાઈ)";
         document.getElementById('branchBadge').className = "branch-badge sub-badge";
         document.getElementById('subHeader').innerText = "સુરત શાખા (Operator Panel)";
         document.getElementById('btnAdminPool').style.display = 'none';
-        document.getElementById('branchField').style.display = 'none'; // સુરત પોતાની બ્રાન્ચ ન બદલી શકે
+        document.getElementById('branchField').style.display = 'none';
+        document.getElementById('adminPinField').style.display = 'none';
         document.getElementById('manageTitle').innerText = "➕ સુરત શાખામાં નવો ક્લાયન્ટ ઉમેરો";
       } else {
         document.getElementById('branchBadge').innerText = "HO: RAJKOT";
@@ -305,51 +357,56 @@
         document.getElementById('subHeader').innerText = "રાજકોટ મુખ્ય બ્રાન્ચ (Full Admin)";
         document.getElementById('btnAdminPool').style.display = 'block';
         document.getElementById('branchField').style.display = 'block';
+        document.getElementById('adminPinField').style.display = 'block';
         document.getElementById('manageTitle').innerText = "➕ નવો ક્લાયન્ટ ઉમેરો";
       }
 
-      // ડિફોલ્ટ સ્ટોક સેટ કરો
-      document.getElementById('stockSearch').value = `RELIANCE ${selectedExpiry} FUT`;
+      updateContractDisplay();
       renderClients();
       renderTrades();
       renderMasterPool();
       renderBills();
     }
 
-    function selectExpiry(month) {
-      selectedExpiry = month;
-      document.getElementById('expNov').classList.toggle('active', month === 'NOV');
-      document.getElementById('expDec').classList.toggle('active', month === 'DEC');
-      document.getElementById('priceLabel').innerText = `ભાવ (${month} FUT)`;
+    function toggleExpiry(type) {
+      selectedExpiryType = type;
+      document.getElementById('expCurrent').classList.toggle('active', type === 'CURRENT');
+      document.getElementById('expNext').classList.toggle('active', type === 'NEXT');
+      updateContractDisplay();
+    }
 
-      // ઇનપુટ બોક્સમાં પણ નામ બદલો
-      if (currentRawStock) {
-        document.getElementById('stockSearch').value = `${currentRawStock} ${selectedExpiry} FUT`;
-        const stock = fnoDatabase.find(s => s.name === currentRawStock);
-        if (stock) {
-          document.getElementById('priceInput').value = month === 'NOV' ? stock.nov : stock.dec;
-        }
+    function getActiveMonthCode() {
+      return selectedExpiryType === 'CURRENT' ? currentExp.monthCode : nextExp.monthCode;
+    }
+
+    function updateContractDisplay() {
+      const activeCode = getActiveMonthCode();
+      document.getElementById('stockSearch').value = `${currentRawStock} ${activeCode} FUT`;
+      document.getElementById('priceLabel').innerText = `ભાવ (${activeCode} FUT)`;
+      
+      const stock = fnoDatabase.find(s => s.name === currentRawStock);
+      if (stock) {
+        document.getElementById('priceInput').value = selectedExpiryType === 'CURRENT' ? stock.price : (stock.price * 1.008).toFixed(2);
       }
     }
 
     function filterStocks() {
-      const input = document.getElementById('stockSearch').value.toUpperCase().replace(/ (NOV|DEC) FUT/g, '').trim();
+      const input = document.getElementById('stockSearch').value.toUpperCase().replace(/ (JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC) FUT/g, '').trim();
       const resultsDiv = document.getElementById('searchResults');
       resultsDiv.innerHTML = "";
       if (!input) { resultsDiv.style.display = "none"; return; }
 
+      const activeCode = getActiveMonthCode();
       const matched = fnoDatabase.filter(s => s.name.includes(input));
       if (matched.length > 0) {
         matched.forEach(s => {
           const div = document.createElement('div');
           div.className = "search-item";
-          div.innerHTML = `<span><b>${s.name} ${selectedExpiry} FUT</b></span> <small style="color:var(--muted)">Lot: ${s.lot}</small>`;
+          div.innerHTML = `<span><b>${s.name} ${activeCode} FUT</b></span> <small style="color:var(--muted)">Lot: ${s.lot}</small>`;
           div.onclick = function() {
             currentRawStock = s.name;
-            // આખું નામ બોક્સમાં લખાશે
-            document.getElementById('stockSearch').value = `${s.name} ${selectedExpiry} FUT`;
+            updateContractDisplay();
             document.getElementById('qtyInput').value = s.lot;
-            document.getElementById('priceInput').value = selectedExpiry === 'NOV' ? s.nov : s.dec;
             resultsDiv.style.display = "none";
           };
           resultsDiv.appendChild(div);
@@ -405,7 +462,7 @@
       const tbody = document.getElementById('masterPoolBody');
       tbody.innerHTML = `
         <tr>
-          <td><b>RELIANCE NOV FUT</b></td>
+          <td><b>RELIANCE ${currentExp.monthCode} FUT</b></td>
           <td>350</td>
           <td>0</td>
           <td class="green">+350 (LONG)</td>
@@ -418,7 +475,7 @@
       const tbody = document.getElementById('billsBody');
       tbody.innerHTML = "";
       clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
-        const msg = encodeURIComponent(`*શુક્રવાર MTM હિસાબ બિલ*\nક્લાયન્ટ: ${c.name} (${c.id})\nબ્રોકરેજ રેટ: ${c.rate}%\nચૂકવવાપાત્ર આખરી બેલેન્સ: ₹${c.bal.toFixed(2)}`);
+        const msg = encodeURIComponent(`*શુક્રવાર MTM હિસાબ બિલ*\nક્લાયન્ટ: ${c.name} (${c.id})\nબ્રોકરેજ: ${c.rate}%\nચૂકવવાપાત્ર આખરી બેલેન્સ: ₹${c.bal.toFixed(2)}`);
         const waLink = `https://wa.me/91${c.phone}?text=${msg}`;
         tbody.innerHTML += `<tr>
           <td>${c.name} (${c.rate}%)</td>
@@ -437,7 +494,7 @@
 
       if (!id || !name) return alert("કૃપા કરીને ID અને નામ ભરો!");
       clients.push({ id, name, branch, phone: mobile, rate: rate, bal: 0 });
-      alert(`નવો ક્લાયન્ટ ${name} (બ્રોકરેજ: ${rate}%) સફળતાપૂર્વક ઉમેરાયો.`);
+      alert(`નવો ક્લાયન્ટ ${name} (બ્રોકરેજ: ${rate}%) ઉમેરાયો.`);
       
       document.getElementById('newClientId').value = '';
       document.getElementById('newClientName').value = '';
@@ -446,6 +503,21 @@
       renderClients();
       renderBills();
       switchTab('terminalTab');
+    }
+
+    function saveNewPins() {
+      const newAdm = document.getElementById('newAdminPin').value.trim();
+      const newSrt = document.getElementById('newSuratPin').value.trim();
+      
+      if (userRole === 'admin' && newAdm) {
+        adminPin = newAdm;
+        localStorage.setItem('app_admin_pin', newAdm);
+      }
+      if (newSrt) {
+        suratPin = newSrt;
+        localStorage.setItem('app_surat_pin', newSrt);
+      }
+      alert("સુરક્ષા PIN સફળતાપૂર્વક અપડેટ થઈ ગયા!");
     }
 
     function placeOrder(action) {
@@ -469,7 +541,7 @@
 
     function adminDelete(id) {
       const pin = prompt("સોદો રદ કરવા માટે Master PIN નાખો:");
-      if (pin === "9999") {
+      if (pin === adminPin) {
         trades = trades.filter(t => t.id !== id);
         alert("સોદો રદ થયો અને બ્રોકરેજ રિવર્સ થઈ.");
         renderTrades();
