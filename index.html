@@ -12,13 +12,11 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 12px; font-size: 14px; }
     
-    /* Login Overlay */
     #loginScreen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #060913;
       display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px;
     }
     .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 100%; max-width: 360px; text-align: center; }
-    .login-box h2 { margin-bottom: 8px; color: #38bdf8; font-size: 20px; }
     
     .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
     .branch-badge { padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }
@@ -36,7 +34,6 @@
     label { font-size: 11px; color: var(--muted); margin-bottom: 3px; display: block; }
     input, select { width: 100%; background: #090d1a; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; outline: none; }
     
-    /* Search Box */
     .search-container { position: relative; }
     .search-results {
       position: absolute; top: 100%; left: 0; right: 0; background: #10172a; border: 1px solid #3b82f6;
@@ -45,7 +42,6 @@
     .search-item { padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; }
     .search-item:active { background: #1e293b; color: #38bdf8; }
 
-    /* Expiry Pill Selector */
     .expiry-toggle { display: flex; gap: 6px; margin-top: 2px; }
     .exp-pill { flex: 1; padding: 6px; background: #090d1a; border: 1px solid var(--border); color: var(--muted); font-size: 11px; font-weight: bold; border-radius: 4px; text-align: center; cursor: pointer; }
     .exp-pill.active { background: #1e3a8a; color: #93c5fd; border-color: #3b82f6; }
@@ -67,7 +63,7 @@
 </head>
 <body>
 
-  <!-- સુરક્ષા લોગિન સ્ક્રીન -->
+  <!-- લોગિન સ્ક્રીન -->
   <div id="loginScreen">
     <div class="login-box">
       <h2>🔐 NSE F&O Terminal</h2>
@@ -100,34 +96,34 @@
     <button class="tab-btn" id="btnManage" onclick="switchTab('manageTab')">👥 ક્લાયન્ટ ઉમેરો</button>
   </div>
 
-  <!-- ટેબ ૧: ટ્રેડિંગ ટર્મિનલ & એક્સપાયરી મંથ સિલેક્શન -->
+  <!-- ટેબ ૧: ઓર્ડર એન્ટ્રી -->
   <div id="terminalTab" class="tab-content">
     <div class="card">
       <div class="card-title">નવો સોદો (F&O Order Entry)</div>
       <div class="form-grid">
         <div class="full-width">
           <label>ક્લાયન્ટ પસંદ કરો</label>
-          <select id="clientSelect"></select>
+          <select id="clientSelect" onchange="onClientChange()"></select>
         </div>
 
-        <!-- સ્ટોક સર્ચ -->
+        <!-- સ્ટોક સર્ચ બોક્સ -->
         <div class="full-width search-container">
-          <label>F&O સ્ટોક (નામ લખો)</label>
-          <input type="text" id="stockSearch" placeholder="દા.ત. RELIANCE, TATA, HDFC" oninput="filterStocks()" autocomplete="off">
+          <label>F&O સ્ટોક અને કોન્ટ્રાક્ટ</label>
+          <input type="text" id="stockSearch" placeholder="દા.ત. RELIANCE, TATASTEEL" oninput="filterStocks()" autocomplete="off">
           <div id="searchResults" class="search-results"></div>
         </div>
 
-        <!-- એક્સપાયરી મંથ સિલેક્ટર (Current vs Next Month) -->
+        <!-- એક્સપાયરી સીરીઝ -->
         <div class="full-width">
           <label>કોન્ટ્રાક્ટ એક્સપાયરી સીરીઝ</label>
           <div class="expiry-toggle">
-            <div class="exp-pill active" id="expNov" onclick="selectExpiry('NOV', 0)">26-NOV-2026 (કરન્ટ)</div>
-            <div class="exp-pill" id="expDec" onclick="selectExpiry('DEC', 8.50)">31-DEC-2026 (નેક્સ્ટ)</div>
+            <div class="exp-pill active" id="expNov" onclick="selectExpiry('NOV')">26-NOV-2026 (કરન્ટ)</div>
+            <div class="exp-pill" id="expDec" onclick="selectExpiry('DEC')">31-DEC-2026 (નેક્સ્ટ)</div>
           </div>
         </div>
 
         <div>
-          <label>ક્વોન્ટિટી (બદલી શકાય)</label>
+          <label>ક્વોન્ટિટી (Editable)</label>
           <input type="number" id="qtyInput" value="250">
         </div>
         <div>
@@ -198,7 +194,7 @@
     </div>
   </div>
 
-  <!-- ટેબ ૪: ક્લાયન્ટ ઉમેરો (સુરત શાખા & રાજકોટ બંને માટે) -->
+  <!-- ટેબ ૪: ક્લાયન્ટ ઉમેરો -->
   <div id="manageTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title" id="manageTitle">➕ નવો ક્લાયન્ટ ઉમેરો</div>
@@ -215,10 +211,14 @@
           <label>મોબાઈલ નંબર (WhatsApp)</label>
           <input type="text" id="newClientMobile" placeholder="98XXXXXXXX">
         </div>
-        <div id="brokerageField">
+        
+        <!-- બ્રોકરેજ રેટ સેટિંગ (બંને માટે ઉપલબ્ધ) -->
+        <div>
           <label>બ્રોકરેજ રેટ (%)</label>
           <input type="number" id="newClientRate" value="0.01" step="0.005">
         </div>
+        
+        <!-- બ્રાન્ચ સિલેક્શન -->
         <div id="branchField">
           <label>બ્રાન્ચ ટેગ</label>
           <select id="newClientBranch">
@@ -234,9 +234,8 @@
   <script>
     let userRole = null;
     let selectedExpiry = 'NOV';
-    let baseStockPrice = 1175.00;
+    let currentRawStock = 'RELIANCE';
 
-    // ૨૧૩+ NSE F&O ડેટાબેઝ
     const fnoDatabase = [
       { name: "RELIANCE", lot: 250, nov: 1175.00, dec: 1184.00 },
       { name: "TATASTEEL", lot: 550, nov: 168.20, dec: 169.50 },
@@ -259,11 +258,11 @@
     ];
 
     let clients = [
-      { id: "C101", name: "રમેશભાઈ", branch: "rajkot", phone: "9825012345", bal: -12.50 },
-      { id: "C102", name: "કિશોરભાઈ", branch: "rajkot", phone: "9898012345", bal: 0.00 },
-      { id: "C201", name: "ભાવેશભાઈ (સુરત)", branch: "surat", phone: "9825111111", bal: 1025.00 },
-      { id: "C202", name: "હિતેશભાઈ (સુરત)", branch: "surat", phone: "9825222222", bal: -250.00 },
-      { id: "C203", name: "વિજયભાઈ (સુરત)", branch: "surat", phone: "9825333333", bal: 450.00 }
+      { id: "C101", name: "રમેશભાઈ", branch: "rajkot", phone: "9825012345", rate: 0.01, bal: -12.50 },
+      { id: "C102", name: "કિશોરભાઈ", branch: "rajkot", phone: "9898012345", rate: 0.02, bal: 0.00 },
+      { id: "C201", name: "ભાવેશભાઈ (સુરત)", branch: "surat", phone: "9825111111", rate: 0.01, bal: 1025.00 },
+      { id: "C202", name: "હિતેશભાઈ (સુરત)", branch: "surat", phone: "9825222222", rate: 0.01, bal: -250.00 },
+      { id: "C203", name: "વિજયભાઈ (સુરત)", branch: "surat", phone: "9825333333", rate: 0.01, bal: 450.00 }
     ];
 
     let trades = [
@@ -298,9 +297,7 @@
         document.getElementById('branchBadge').className = "branch-badge sub-badge";
         document.getElementById('subHeader').innerText = "સુરત શાખા (Operator Panel)";
         document.getElementById('btnAdminPool').style.display = 'none';
-        // નરેશભાઈ માટે ક્લાયન્ટ ફોર્મ લોક કરવું
-        document.getElementById('branchField').style.display = 'none';
-        document.getElementById('brokerageField').style.display = 'none';
+        document.getElementById('branchField').style.display = 'none'; // સુરત પોતાની બ્રાન્ચ ન બદલી શકે
         document.getElementById('manageTitle').innerText = "➕ સુરત શાખામાં નવો ક્લાયન્ટ ઉમેરો";
       } else {
         document.getElementById('branchBadge').innerText = "HO: RAJKOT";
@@ -308,30 +305,35 @@
         document.getElementById('subHeader').innerText = "રાજકોટ મુખ્ય બ્રાન્ચ (Full Admin)";
         document.getElementById('btnAdminPool').style.display = 'block';
         document.getElementById('branchField').style.display = 'block';
-        document.getElementById('brokerageField').style.display = 'block';
+        document.getElementById('manageTitle').innerText = "➕ નવો ક્લાયન્ટ ઉમેરો";
       }
 
+      // ડિફોલ્ટ સ્ટોક સેટ કરો
+      document.getElementById('stockSearch').value = `RELIANCE ${selectedExpiry} FUT`;
       renderClients();
       renderTrades();
       renderMasterPool();
       renderBills();
     }
 
-    function selectExpiry(month, premium) {
+    function selectExpiry(month) {
       selectedExpiry = month;
       document.getElementById('expNov').classList.toggle('active', month === 'NOV');
       document.getElementById('expDec').classList.toggle('active', month === 'DEC');
       document.getElementById('priceLabel').innerText = `ભાવ (${month} FUT)`;
 
-      const stockName = document.getElementById('stockSearch').value;
-      const stock = fnoDatabase.find(s => s.name === stockName);
-      if (stock) {
-        document.getElementById('priceInput').value = month === 'NOV' ? stock.nov : stock.dec;
+      // ઇનપુટ બોક્સમાં પણ નામ બદલો
+      if (currentRawStock) {
+        document.getElementById('stockSearch').value = `${currentRawStock} ${selectedExpiry} FUT`;
+        const stock = fnoDatabase.find(s => s.name === currentRawStock);
+        if (stock) {
+          document.getElementById('priceInput').value = month === 'NOV' ? stock.nov : stock.dec;
+        }
       }
     }
 
     function filterStocks() {
-      const input = document.getElementById('stockSearch').value.toUpperCase();
+      const input = document.getElementById('stockSearch').value.toUpperCase().replace(/ (NOV|DEC) FUT/g, '').trim();
       const resultsDiv = document.getElementById('searchResults');
       resultsDiv.innerHTML = "";
       if (!input) { resultsDiv.style.display = "none"; return; }
@@ -341,9 +343,11 @@
         matched.forEach(s => {
           const div = document.createElement('div');
           div.className = "search-item";
-          div.innerHTML = `<span><b>${s.name}</b> <small style="color:#38bdf8">${selectedExpiry} FUT</small></span> <small style="color:var(--muted)">Lot: ${s.lot}</small>`;
+          div.innerHTML = `<span><b>${s.name} ${selectedExpiry} FUT</b></span> <small style="color:var(--muted)">Lot: ${s.lot}</small>`;
           div.onclick = function() {
-            document.getElementById('stockSearch').value = s.name;
+            currentRawStock = s.name;
+            // આખું નામ બોક્સમાં લખાશે
+            document.getElementById('stockSearch').value = `${s.name} ${selectedExpiry} FUT`;
             document.getElementById('qtyInput').value = s.lot;
             document.getElementById('priceInput').value = selectedExpiry === 'NOV' ? s.nov : s.dec;
             resultsDiv.style.display = "none";
@@ -373,7 +377,7 @@
       const select = document.getElementById('clientSelect');
       select.innerHTML = "";
       clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
-        select.innerHTML += `<option value="${c.id}">${c.id} - ${c.name} (${c.branch==='surat'?'સુરત':'રાજકોટ'})</option>`;
+        select.innerHTML += `<option value="${c.id}">${c.id} - ${c.name} (${c.branch==='surat'?'સુરત':'રાજકોટ'}) [${c.rate}%]</option>`;
       });
     }
 
@@ -414,10 +418,10 @@
       const tbody = document.getElementById('billsBody');
       tbody.innerHTML = "";
       clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
-        const msg = encodeURIComponent(`*શુક્રવાર MTM હિસાબ બિલ*\nક્લાયન્ટ: ${c.name} (${c.id})\nચૂકવવાપાત્ર આખરી બેલેન્સ: ₹${c.bal.toFixed(2)}`);
+        const msg = encodeURIComponent(`*શુક્રવાર MTM હિસાબ બિલ*\nક્લાયન્ટ: ${c.name} (${c.id})\nબ્રોકરેજ રેટ: ${c.rate}%\nચૂકવવાપાત્ર આખરી બેલેન્સ: ₹${c.bal.toFixed(2)}`);
         const waLink = `https://wa.me/91${c.phone}?text=${msg}`;
         tbody.innerHTML += `<tr>
-          <td>${c.name}</td>
+          <td>${c.name} (${c.rate}%)</td>
           <td class="${c.bal>=0?'green':'red'}">₹${c.bal.toFixed(2)}</td>
           <td><a href="${waLink}" class="btn-wa" target="_blank">📲 WhatsApp</a></td>
         </tr>`;
@@ -428,11 +432,12 @@
       const id = document.getElementById('newClientId').value.trim();
       const name = document.getElementById('newClientName').value.trim();
       const mobile = document.getElementById('newClientMobile').value.trim();
+      const rate = parseFloat(document.getElementById('newClientRate').value) || 0.01;
       const branch = userRole === 'admin' ? document.getElementById('newClientBranch').value : 'surat';
 
       if (!id || !name) return alert("કૃપા કરીને ID અને નામ ભરો!");
-      clients.push({ id, name, branch, phone: mobile, bal: 0 });
-      alert(`નવો ક્લાયન્ટ ${name} (${branch === 'surat' ? 'સુરત' : 'રાજકોટ'}) ઉમેરાઈ ગયો.`);
+      clients.push({ id, name, branch, phone: mobile, rate: rate, bal: 0 });
+      alert(`નવો ક્લાયન્ટ ${name} (બ્રોકરેજ: ${rate}%) સફળતાપૂર્વક ઉમેરાયો.`);
       
       document.getElementById('newClientId').value = '';
       document.getElementById('newClientName').value = '';
@@ -445,12 +450,11 @@
 
     function placeOrder(action) {
       const client = document.getElementById('clientSelect').value;
-      const stock = document.getElementById('stockSearch').value;
+      const contract = document.getElementById('stockSearch').value;
       const qty = document.getElementById('qtyInput').value;
       const price = document.getElementById('priceInput').value;
-      if (!stock) return alert("કૃપા કરીને સ્ટોક પસંદ કરો!");
+      if (!contract) return alert("કૃપા કરીને સ્ટોક પસંદ કરો!");
 
-      const contract = `${stock} ${selectedExpiry} FUT`;
       trades.push({
         id: "TR_" + new Date().getTime(),
         client: client,
@@ -459,7 +463,7 @@
         action: action,
         qty: qty
       });
-      alert(`સોદો પંચ થયો:\nકોન્ટ્રાક્ટ: ${contract}\nજથ્થો: ${qty} @ ₹${price}`);
+      alert(`સોદો સેવ થયો:\nકોન્ટ્રાક્ટ: ${contract}\nજથ્થો: ${qty} @ ₹${price}`);
       renderTrades();
     }
 
