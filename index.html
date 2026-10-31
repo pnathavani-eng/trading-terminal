@@ -63,6 +63,7 @@
     .green { color: var(--green); font-weight: bold; }
     .red { color: var(--red); font-weight: bold; }
     .timestamp-text { font-size: 10px; color: var(--muted); display: block; margin-top: 2px; }
+    .sync-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #064e3b; color: #6ee7b7; font-weight: normal; }
   </style>
 </head>
 <body>
@@ -84,6 +85,7 @@
       <small id="subHeader" style="color:var(--muted)">Rajkot HQ</small>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
+      <span class="sync-badge">🟢 Live Sheet</span>
       <span id="branchBadge" class="branch-badge admin-badge">HO: RAJKOT</span>
       <button onclick="logout()" style="background:none; border:1px solid var(--border); color:var(--muted); padding:3px 6px; border-radius:4px; font-size:11px;">Logout</button>
     </div>
@@ -132,12 +134,12 @@
         </div>
       </div>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
-        <button class="btn btn-buy" onclick="placeOrder('BUY')">BUY</button>
-        <button class="btn btn-sell" onclick="placeOrder('SELL')">SELL</button>
+        <button class="btn btn-buy" id="btnBuy" onclick="placeOrder('BUY')">BUY</button>
+        <button class="btn btn-sell" id="btnSell" onclick="placeOrder('SELL')">SELL</button>
       </div>
     </div>
 
-    <!-- Active Positions with Exact Time -->
+    <!-- Active Positions -->
     <div class="card">
       <div class="card-title">Active Positions</div>
       <table>
@@ -177,7 +179,7 @@
     </div>
   </div>
 
-  <!-- TAB 3: Weekly Billing with Specific Week Filter (Mon to Fri) -->
+  <!-- TAB 3: Weekly Billing (Mon-Fri Filter) -->
   <div id="billingTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title">
@@ -267,6 +269,9 @@
   </div>
 
   <script>
+    // LIVE GOOGLE SHEET WEB APP URL
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx60jXYN5c8Lt20FQ0DSpkSv5fw88-VCq-GqfOqA0NIiIudbxfGBZpG4LNqnyRRnXh6/exec";
+
     let adminPin = localStorage.getItem('app_admin_pin') || "9999";
     let suratPin = localStorage.getItem('app_surat_pin') || "1111";
 
@@ -275,12 +280,10 @@
     let currentRawStock = 'RELIANCE';
     let isEditingClientId = null;
 
-    // Current Week Bounds (Monday to Friday)
     function getCurrentWeekRange() {
       const now = new Date();
-      const currentDay = now.getDay(); // 0 is Sun, 1 is Mon...
+      const currentDay = now.getDay();
       const distanceToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
-      
       const monday = new Date(now);
       monday.setDate(now.getDate() + distanceToMonday);
       monday.setHours(0, 0, 0, 0);
@@ -443,6 +446,17 @@
 
     let trades = JSON.parse(localStorage.getItem('app_trades_clean')) || [];
 
+    // Background Google Sheet Sync
+    function syncToGoogleSheet(payload) {
+      if (!GOOGLE_SCRIPT_URL) return;
+      fetch(GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).catch(err => console.log("Sheet Sync Note:", err));
+    }
+
     function verifyLogin() {
       const pin = document.getElementById('pinInput').value;
       if (pin === adminPin) {
@@ -585,7 +599,6 @@
       });
     }
 
-    // Active Positions Display with Exact Execution Time
     function renderTrades() {
       const tbody = document.getElementById('tradesBody');
       tbody.innerHTML = "";
@@ -629,7 +642,6 @@
       `;
     }
 
-    // Filter trades strictly within the active trading week (Monday to Friday)
     function getClientWeeklyTrades(clientId) {
       return trades.filter(t => {
         if (t.clientId !== clientId) return false;
@@ -638,7 +650,6 @@
       });
     }
 
-    // Direct Statement File Generator (Only 1-Week Trades with Exact Time)
     function shareClientFile(clientId) {
       const client = clients.find(c => c.id === clientId);
       if (!client) return;
@@ -672,7 +683,6 @@
       const filename = `Statement_${client.id}_${client.name}_Week.csv`;
       const file = new File([blob], filename, { type: 'text/csv' });
 
-      // iPhone Native Share Sheet -> Select WhatsApp -> Sends Exact CSV/Excel File directly!
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         navigator.share({
           files: [file],
@@ -768,6 +778,17 @@
       } else {
         clients.push({ id, name, branch, phone: mobile, rate: rate, bal: 0 });
         alert(`Client ${name} registered under ${id} successfully!`);
+
+        // Send to Live Google Sheet
+        syncToGoogleSheet({
+          action: "add_client",
+          id: id,
+          name: name,
+          mobile: mobile,
+          rate: rate,
+          branch: branch
+        });
+
         document.getElementById('newClientName').value = '';
         document.getElementById('newClientMobile').value = '';
         autoGenerateClientId();
@@ -791,7 +812,6 @@
       }
     }
 
-    // Place Order: Automatic Time Tracking (Exact HH:mm:ss)
     function placeOrder(action) {
       const selectedId = document.getElementById('clientSelect').value;
       const clientObj = clients.find(c => c.id === selectedId);
@@ -803,13 +823,12 @@
       if (!contract) return alert("Please select a stock!");
 
       const now = new Date();
-      // Format: DD/MM/YYYY HH:mm:ss
       const formattedTimestamp = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${now.toLocaleTimeString()}`;
 
       const turnover = qty * price;
       const brokerage = turnover * (clientObj.rate / 100);
 
-      trades.push({
+      const tradeObj = {
         id: "TR_" + now.getTime(),
         clientId: clientObj.id,
         clientName: clientObj.name,
@@ -820,11 +839,29 @@
         price: price,
         brokerage: brokerage,
         timestamp: formattedTimestamp,
-        isoDate: now.toISOString()
+        isoDate: now.toISOString(),
+        expiry: selectedExpiryType === 'CURRENT' ? currentExp.formatted : nextExp.formatted
+      };
+
+      trades.push(tradeObj);
+      localStorage.setItem('app_trades_clean', JSON.stringify(trades));
+
+      // Send Trade to Live Google Sheet
+      syncToGoogleSheet({
+        action: "add_trade",
+        id: tradeObj.id,
+        timestamp: tradeObj.timestamp,
+        branch: tradeObj.branch,
+        clientId: tradeObj.clientId,
+        clientName: tradeObj.clientName,
+        contract: tradeObj.contract,
+        action: tradeObj.action,
+        qty: tradeObj.qty,
+        price: tradeObj.price,
+        expiry: tradeObj.expiry
       });
 
-      localStorage.setItem('app_trades_clean', JSON.stringify(trades));
-      alert(`Order Executed & Logged:\nTime: ${formattedTimestamp}\nClient: ${clientObj.id} - ${clientObj.name}\nContract: ${contract}\nQty: ${qty} @ ₹${price}`);
+      alert(`Order Executed & Logged to Google Sheet:\nTime: ${formattedTimestamp}\nClient: ${clientObj.id} - ${clientObj.name}\nContract: ${contract}\nQty: ${qty} @ ₹${price}`);
       renderTrades();
       renderBills();
     }
