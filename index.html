@@ -12,7 +12,6 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 12px; font-size: 14px; }
     
-    /* Login Overlay */
     #loginScreen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #060913;
       display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px;
@@ -40,7 +39,7 @@
     .search-container { position: relative; }
     .search-results {
       position: absolute; top: 100%; left: 0; right: 0; background: #10172a; border: 1px solid #3b82f6;
-      border-radius: 6px; max-height: 180px; overflow-y: auto; z-index: 100; display: none; margin-top: 2px;
+      border-radius: 6px; max-height: 220px; overflow-y: auto; z-index: 100; display: none; margin-top: 2px;
     }
     .search-item { padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; }
     .search-item:active { background: #1e293b; color: #38bdf8; }
@@ -88,7 +87,7 @@
     </div>
   </div>
 
-  <!-- Tabs Navigation -->
+  <!-- Navigation -->
   <div class="nav-tabs">
     <button class="tab-btn active" onclick="switchTab('terminalTab')">📈 Trading Terminal</button>
     <button class="tab-btn" id="btnAdminPool" onclick="switchTab('poolTab')">🏛️ Master Pool</button>
@@ -97,7 +96,7 @@
     <button class="tab-btn" id="btnSettings" onclick="switchTab('settingsTab')">⚙️ PIN Settings</button>
   </div>
 
-  <!-- TAB 1: Order Entry -->
+  <!-- TAB 1: Trading Terminal -->
   <div id="terminalTab" class="tab-content">
     <div class="card">
       <div class="card-title">New Order (F&O Entry)</div>
@@ -108,13 +107,13 @@
         </div>
 
         <div class="full-width search-container">
-          <label>F&O Stock & Contract</label>
-          <input type="text" id="stockSearch" placeholder="e.g. RELIANCE, TATASTEEL" oninput="filterStocks()" autocomplete="off">
+          <label>F&O Stock (216 NSE Contracts)</label>
+          <input type="text" id="stockSearch" placeholder="Type stock name (e.g. TATA, RELIANCE, HDFC)" oninput="filterStocks()" autocomplete="off">
           <div id="searchResults" class="search-results"></div>
         </div>
 
         <div class="full-width">
-          <label>Contract Expiry (Auto Calendar)</label>
+          <label>Contract Expiry (Auto Rolling)</label>
           <div class="expiry-toggle">
             <div class="exp-pill active" id="expCurrent" onclick="toggleExpiry('CURRENT')">Current</div>
             <div class="exp-pill" id="expNext" onclick="toggleExpiry('NEXT')">Next</div>
@@ -136,7 +135,6 @@
       </div>
     </div>
 
-    <!-- Active Trades -->
     <div class="card">
       <div class="card-title">Active Positions</div>
       <table>
@@ -154,7 +152,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: Master Pool -->
+  <!-- TAB 2: Master Broker Pool -->
   <div id="poolTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title">
@@ -193,46 +191,46 @@
     </div>
   </div>
 
-  <!-- TAB 4: Client Management & Smart Recycling -->
+  <!-- TAB 4: Client Management & Prefix Generator -->
   <div id="manageTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title" id="manageTitle">➕ Add New Client</div>
       <div class="form-grid">
+        <div id="branchField">
+          <label>Branch / Sub-Broker</label>
+          <select id="newClientBranch" onchange="autoGenerateClientId()">
+            <option value="rajkot" data-prefix="R">Rajkot HQ (Direct - R)</option>
+            <option value="surat" data-prefix="N">Surat Branch (Nareshbhai - N)</option>
+          </select>
+        </div>
         <div>
-          <label>Client ID (Auto Assigned)</label>
+          <label>Client Code (Auto Assigned)</label>
           <input type="text" id="newClientId" readonly>
         </div>
         <div>
           <label>Full Name</label>
           <input type="text" id="newClientName" placeholder="Client Name">
         </div>
-        <div class="full-width">
+        <div>
           <label>Mobile Number (WhatsApp)</label>
           <input type="text" id="newClientMobile" placeholder="98XXXXXXXX">
         </div>
-        <div>
+        <div class="full-width">
           <label>Brokerage Rate (%)</label>
           <input type="number" id="newClientRate" value="0.01" step="0.005">
-        </div>
-        <div id="branchField">
-          <label>Branch Tag</label>
-          <select id="newClientBranch" onchange="autoGenerateClientId()">
-            <option value="rajkot">Rajkot Head Office</option>
-            <option value="surat">Surat Branch (Nareshbhai)</option>
-          </select>
         </div>
       </div>
       <button class="btn btn-primary" onclick="addNewClient()">Save Client</button>
     </div>
 
-    <!-- Active Clients List with Exit Option -->
     <div class="card">
-      <div class="card-title">Existing Clients (Directory)</div>
+      <div class="card-title">Existing Clients Directory</div>
       <table>
         <thead>
           <tr>
             <th>ID</th>
             <th>Name</th>
+            <th>Branch</th>
             <th>Rate</th>
             <th>Action</th>
           </tr>
@@ -292,39 +290,130 @@
     let currentExp = getNseExpiry(0);
     let nextExp = getNseExpiry(1);
 
+    // FULL COMPLETE 216 NSE F&O STOCKS DATABASE
     const fnoDatabase = [
-      { name: "RELIANCE", lot: 250, price: 1175.00 },
-      { name: "TATASTEEL", lot: 550, price: 168.20 },
-      { name: "TATAMOTORS", lot: 700, price: 890.00 },
-      { name: "TATACHEM", lot: 550, price: 1040.00 },
-      { name: "TATAPOWER", lot: 1500, price: 420.00 },
-      { name: "TATACONSUM", lot: 900, price: 1120.00 },
-      { name: "TCS", lot: 175, price: 4120.00 },
-      { name: "HDFCBANK", lot: 650, price: 695.50 },
-      { name: "ICICIBANK", lot: 700, price: 1280.00 },
-      { name: "SBIN", lot: 750, price: 820.00 },
-      { name: "AXISBANK", lot: 625, price: 1190.00 },
-      { name: "KOTAKBANK", lot: 2000, price: 1780.00 },
-      { name: "INFY", lot: 400, price: 1850.00 },
-      { name: "DRREDDY", lot: 625, price: 6600.00 },
-      { name: "ITC", lot: 1725, price: 485.00 },
-      { name: "LT", lot: 175, price: 3600.00 },
-      { name: "MARUTI", lot: 50, price: 12100.00 },
-      { name: "BAJFINANCE", lot: 750, price: 6900.00 }
+      { name: "AARTIIND", lot: 1000, price: 480.0 }, { name: "ABB", lot: 125, price: 7850.0 },
+      { name: "ABBOTINDIA", lot: 40, price: 28500.0 }, { name: "ABCAPITAL", lot: 3100, price: 215.0 },
+      { name: "ABFRL", lot: 2600, price: 310.0 }, { name: "ACC", lot: 300, price: 2450.0 },
+      { name: "ADANIENSOL", lot: 675, price: 980.0 }, { name: "ADANIENT", lot: 309, price: 2980.0 },
+      { name: "ADANIGREEN", lot: 600, price: 1850.0 }, { name: "ADANIPORTS", lot: 475, price: 1420.0 },
+      { name: "ADANIPOWER", lot: 3550, price: 640.0 }, { name: "ALKEM", lot: 125, price: 5650.0 },
+      { name: "AMBER", lot: 100, price: 6200.0 }, { name: "AMBUJACEM", lot: 1200, price: 590.0 },
+      { name: "ANGELONE", lot: 250, price: 2850.0 }, { name: "APLAPOLLO", lot: 350, price: 1480.0 },
+      { name: "APOLLOHOSP", lot: 125, price: 7100.0 }, { name: "APOLLOTYRE", lot: 1700, price: 490.0 },
+      { name: "ASHOKLEY", lot: 5000, price: 215.0 }, { name: "ASIANPAINT", lot: 250, price: 2450.0 },
+      { name: "ASTRAL", lot: 425, price: 1850.0 }, { name: "ATGL", lot: 875, price: 690.0 },
+      { name: "AUBANK", lot: 1000, price: 620.0 }, { name: "AUROPHARMA", lot: 550, price: 1420.0 },
+      { name: "AXISBANK", lot: 625, price: 1190.0 }, { name: "BAJAJ-AUTO", lot: 75, price: 9800.0 },
+      { name: "BAJAJFINSV", lot: 300, price: 1850.0 }, { name: "BAJFINANCE", lot: 750, price: 6900.0 },
+      { name: "BALKRISIND", lot: 300, price: 2850.0 }, { name: "BANDHANBNK", lot: 3600, price: 185.0 },
+      { name: "BANKBARODA", lot: 2925, price: 245.0 }, { name: "BANKINDIA", lot: 5200, price: 115.0 },
+      { name: "BATAINDIA", lot: 375, price: 1340.0 }, { name: "BEL", lot: 1425, price: 295.0 },
+      { name: "BERGEPAINT", lot: 1100, price: 510.0 }, { name: "BHARATFORG", lot: 500, price: 1450.0 },
+      { name: "BHARTIARTL", lot: 475, price: 1640.0 }, { name: "BHEL", lot: 2625, price: 245.0 },
+      { name: "BIOCON", lot: 2500, price: 320.0 }, { name: "BOSCHLTD", lot: 25, price: 33500.0 },
+      { name: "BPCL", lot: 1975, price: 340.0 }, { name: "BRITANNIA", lot: 125, price: 5800.0 },
+      { name: "BSE", lot: 200, price: 4500.0 }, { name: "CANBK", lot: 6750, price: 102.0 },
+      { name: "CANFINHOME", lot: 975, price: 830.0 }, { name: "CDSL", lot: 475, price: 1550.0 },
+      { name: "CESC", lot: 3500, price: 185.0 }, { name: "CGPOWER", lot: 850, price: 720.0 },
+      { name: "CHAMBLFERT", lot: 1500, price: 485.0 }, { name: "CHOLAFIN", lot: 625, price: 1540.0 },
+      { name: "CIPLA", lot: 425, price: 1560.0 }, { name: "COALINDIA", lot: 1350, price: 480.0 },
+      { name: "COFORGE", lot: 475, price: 7800.0 }, { name: "COLPAL", lot: 275, price: 3350.0 },
+      { name: "CONCOR", lot: 1250, price: 910.0 }, { name: "COROMANDEL", lot: 700, price: 1680.0 },
+      { name: "CROMPTON", lot: 2150, price: 410.0 }, { name: "CUMMINSIND", lot: 200, price: 3650.0 },
+      { name: "CYIENT", lot: 325, price: 1890.0 }, { name: "DABUR", lot: 1250, price: 530.0 },
+      { name: "DALBHARAT", lot: 250, price: 1850.0 }, { name: "DEEPAKNTR", lot: 300, price: 2750.0 },
+      { name: "DELHIVERY", lot: 2075, price: 380.0 }, { name: "DIVISLAB", lot: 100, price: 5850.0 },
+      { name: "DIXON", lot: 50, price: 14200.0 }, { name: "DLF", lot: 950, price: 840.0 },
+      { name: "DRREDDY", lot: 625, price: 6600.0 }, { name: "EICHERMOT", lot: 100, price: 4800.0 },
+      { name: "ESCORTS", lot: 175, price: 3750.0 }, { name: "EXIDEIND", lot: 1200, price: 460.0 },
+      { name: "FEDERALBNK", lot: 2500, price: 195.0 }, { name: "GAIL", lot: 3550, price: 210.0 },
+      { name: "GLENMARK", lot: 375, price: 1720.0 }, { name: "GMRAIRPORT", lot: 6975, price: 85.0 },
+      { name: "GODREJCP", lot: 500, price: 1250.0 }, { name: "GODREJPROP", lot: 325, price: 2900.0 },
+      { name: "GRANULES", lot: 1000, price: 560.0 }, { name: "GRASIM", lot: 250, price: 2650.0 },
+      { name: "GUJGASLTD", lot: 1250, price: 540.0 }, { name: "HAL", lot: 150, price: 4350.0 },
+      { name: "HAVELLS", lot: 500, price: 1780.0 }, { name: "HCLTECH", lot: 400, price: 1720.0 },
+      { name: "HDFCAMC", lot: 300, price: 4250.0 }, { name: "HDFCBANK", lot: 650, price: 695.5 },
+      { name: "HDFCLIFE", lot: 1100, price: 715.0 }, { name: "HEROMOTOCO", lot: 150, price: 4950.0 },
+      { name: "HINDALCO", lot: 700, price: 680.0 }, { name: "HINDPETRO", lot: 2025, price: 365.0 },
+      { name: "HINDUNILVR", lot: 300, price: 2480.0 }, { name: "HINDZINC", lot: 1225, price: 495.0 },
+      { name: "HUDCO", lot: 2800, price: 220.0 }, { name: "ICICIBANK", lot: 700, price: 1280.0 },
+      { name: "ICICIGI", lot: 325, price: 1850.0 }, { name: "ICICIPRULI", lot: 925, price: 740.0 },
+      { name: "IDEA", lot: 71475, price: 8.5 }, { name: "IDFCFIRSTB", lot: 9275, price: 72.0 },
+      { name: "IEX", lot: 4350, price: 195.0 }, { name: "IGL", lot: 1375, price: 410.0 },
+      { name: "INDHOTEL", lot: 1000, price: 690.0 }, { name: "INDIACEM", lot: 2900, price: 360.0 },
+      { name: "INDIAMART", lot: 300, price: 2800.0 }, { name: "INDIGO", lot: 150, price: 4250.0 },
+      { name: "INDUSINDBK", lot: 700, price: 1080.0 }, { name: "INDUSTOWER", lot: 1700, price: 345.0 },
+      { name: "INFY", lot: 400, price: 1850.0 }, { name: "IOC", lot: 4875, price: 175.0 },
+      { name: "IPCALAB", lot: 650, price: 1550.0 }, { name: "IRCTC", lot: 875, price: 840.0 },
+      { name: "IRFC", lot: 5425, price: 145.0 }, { name: "ITC", lot: 1725, price: 485.0 },
+      { name: "JINDALSTEL", lot: 625, price: 940.0 }, { name: "JIOFIN", lot: 2350, price: 340.0 },
+      { name: "JKCEMENT", lot: 125, price: 4200.0 }, { name: "JSWENERGY", lot: 1075, price: 680.0 },
+      { name: "JSWSTEEL", lot: 675, price: 960.0 }, { name: "JUBLFOOD", lot: 1250, price: 620.0 },
+      { name: "KALYANKJIL", lot: 1350, price: 690.0 }, { name: "KAYNES", lot: 125, price: 5400.0 },
+      { name: "KEI", lot: 125, price: 4350.0 }, { name: "KOTAKBANK", lot: 2000, price: 1780.0 },
+      { name: "KPITTECH", lot: 300, price: 1540.0 }, { name: "L&TFH", lot: 2250, price: 165.0 },
+      { name: "LALPATHLAB", lot: 300, price: 3100.0 }, { name: "LAURUSLABS", lot: 850, price: 460.0 },
+      { name: "LICHSGFIN", lot: 1000, price: 640.0 }, { name: "LICI", lot: 1400, price: 920.0 },
+      { name: "LTIM", lot: 150, price: 5950.0 }, { name: "LT", lot: 175, price: 3600.0 },
+      { name: "LUPIN", lot: 425, price: 2150.0 }, { name: "M&M", lot: 350, price: 2950.0 },
+      { name: "M&MFIN", lot: 2000, price: 280.0 }, { name: "MANAPPURAM", lot: 3000, price: 160.0 },
+      { name: "MARICO", lot: 1200, price: 635.0 }, { name: "MARUTI", lot: 50, price: 12100.0 },
+      { name: "MAXHEALTH", lot: 500, price: 980.0 }, { name: "MCX", lot: 250, price: 6100.0 },
+      { name: "METROPOLIS", lot: 300, price: 2150.0 }, { name: "MFSL", lot: 650, price: 1280.0 },
+      { name: "MGL", lot: 400, price: 1620.0 }, { name: "MOTHERSON", lot: 4400, price: 145.0 },
+      { name: "MPHASIS", lot: 275, price: 2950.0 }, { name: "MRF", lot: 10, price: 128000.0 },
+      { name: "MUTHOOTFIN", lot: 350, price: 1950.0 }, { name: "NATIONALUM", lot: 3750, price: 225.0 },
+      { name: "NAUKRI", lot: 125, price: 7200.0 }, { name: "NAVINFLUOR", lot: 175, price: 3350.0 },
+      { name: "NESTLEIND", lot: 200, price: 2350.0 }, { name: "NMDC", lot: 3375, price: 230.0 },
+      { name: "NTPC", lot: 1500, price: 410.0 }, { name: "NYKAA", lot: 2850, price: 185.0 },
+      { name: "OBEROIRLTY", lot: 350, price: 1880.0 }, { name: "OFSS", lot: 100, price: 11400.0 },
+      { name: "OIL", lot: 1400, price: 490.0 }, { name: "ONGC", lot: 2550, price: 290.0 },
+      { name: "PAGEIND", lot: 15, price: 44500.0 }, { name: "PAYTM", lot: 850, price: 760.0 },
+      { name: "PEL", lot: 750, price: 1020.0 }, { name: "PERSISTENT", lot: 100, price: 5450.0 },
+      { name: "PETRONET", lot: 3000, price: 330.0 }, { name: "PFC", lot: 1300, price: 480.0 },
+      { name: "PHOENIXLTD", lot: 350, price: 1650.0 }, { name: "PIDILITIND", lot: 250, price: 3100.0 },
+      { name: "PIIND", lot: 250, price: 4350.0 }, { name: "PNB", lot: 8000, price: 105.0 },
+      { name: "POLICYBZR", lot: 350, price: 1720.0 }, { name: "POLYCAB", lot: 125, price: 6750.0 },
+      { name: "POONAWALLA", lot: 1100, price: 360.0 }, { name: "POWERGRID", lot: 1800, price: 330.0 },
+      { name: "PRESTIGE", lot: 400, price: 1740.0 }, { name: "PVRINOX", lot: 400, price: 1550.0 },
+      { name: "RAMCOCEM", lot: 850, price: 890.0 }, { name: "RBLBANK", lot: 2500, price: 195.0 },
+      { name: "RECLTD", lot: 1400, price: 520.0 }, { name: "RELIANCE", lot: 250, price: 1175.0 },
+      { name: "SAIL", lot: 4000, price: 128.0 }, { name: "SBICARD", lot: 800, price: 720.0 },
+      { name: "SBILIFE", lot: 750, price: 1680.0 }, { name: "SBIN", lot: 750, price: 820.0 },
+      { name: "SHREECEM", lot: 25, price: 25500.0 }, { name: "SHRIRAMFIN", lot: 150, price: 3150.0 },
+      { name: "SIEMENS", lot: 125, price: 7350.0 }, { name: "SOLARINDS", lot: 75, price: 10200.0 },
+      { name: "SONACOMS", lot: 850, price: 680.0 }, { name: "SRF", lot: 375, price: 2350.0 },
+      { name: "SUNPHARMA", lot: 350, price: 1820.0 }, { name: "SUNTV", lot: 1500, price: 780.0 },
+      { name: "SUPREMEIND", lot: 125, price: 4750.0 }, { name: "SUZLON", lot: 8400, price: 65.0 },
+      { name: "SYNGENE", lot: 1000, price: 860.0 }, { name: "TATACHEM", lot: 550, price: 1040.0 },
+      { name: "TATACOMM", lot: 500, price: 1950.0 }, { name: "TATACONSUM", lot: 900, price: 1120.0 },
+      { name: "TATAELXSI", lot: 100, price: 7450.0 }, { name: "TATAMOTORS", lot: 700, price: 890.0 },
+      { name: "TATAPOWER", lot: 1500, price: 420.0 }, { name: "TATASTEEL", lot: 550, price: 168.2 },
+      { name: "TCS", lot: 175, price: 4120.0 }, { name: "TECHM", lot: 600, price: 1680.0 },
+      { name: "TIINDIA", lot: 125, price: 4100.0 }, { name: "TITAN", lot: 175, price: 3450.0 },
+      { name: "TORNTPHARM", lot: 250, price: 3250.0 }, { name: "TORNTPOWER", lot: 750, price: 1680.0 },
+      { name: "TRENT", lot: 100, price: 6950.0 }, { name: "TVSMOTOR", lot: 350, price: 2450.0 },
+      { name: "UBL", lot: 400, price: 1950.0 }, { name: "ULTRACEMCO", lot: 100, price: 11200.0 },
+      { name: "UNIONBANK", lot: 4425, price: 120.0 }, { name: "UNITDSPR", lot: 400, price: 1550.0 },
+      { name: "UPL", lot: 1300, price: 540.0 }, { name: "VBL", lot: 625, price: 590.0 },
+      { name: "VEDL", lot: 1150, price: 470.0 }, { name: "VOLTAS", lot: 350, price: 1720.0 },
+      { name: "WIPRO", lot: 1500, price: 540.0 }, { name: "YESBANK", lot: 25000, price: 21.0 },
+      { name: "ZOMATO", lot: 2425, price: 260.0 }, { name: "ZYDUSLIFE", lot: 900, price: 1050.0 }
     ];
 
     let clients = JSON.parse(localStorage.getItem('app_clients')) || [
-      { id: "C1", name: "Rameshbhai", branch: "rajkot", phone: "9825012345", rate: 0.01, bal: -12.50 },
-      { id: "C2", name: "Kishorbhai", branch: "rajkot", phone: "9898012345", rate: 0.02, bal: 0.00 },
-      { id: "C3", name: "Bhaveshbhai", branch: "surat", phone: "9825111111", rate: 0.01, bal: 1025.00 },
-      { id: "C4", name: "Hiteshbhai", branch: "surat", phone: "9825222222", rate: 0.01, bal: -250.00 },
-      { id: "C5", name: "Vijaybhai", branch: "surat", phone: "9825333333", rate: 0.01, bal: 450.00 }
+      { id: "R1", name: "Rameshbhai", branch: "rajkot", phone: "9825012345", rate: 0.01, bal: -12.50 },
+      { id: "R2", name: "Kishorbhai", branch: "rajkot", phone: "9898012345", rate: 0.02, bal: 0.00 },
+      { id: "N1", name: "Bhaveshbhai", branch: "surat", phone: "9825111111", rate: 0.01, bal: 1025.00 },
+      { id: "N2", name: "Hiteshbhai", branch: "surat", phone: "9825222222", rate: 0.01, bal: -250.00 },
+      { id: "N3", name: "Vijaybhai", branch: "surat", phone: "9825333333", rate: 0.01, bal: 450.00 }
     ];
 
     let trades = [
-      { id: "TR_1001", client: "C1 - Rameshbhai", branch: "rajkot", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 100 },
-      { id: "TR_1002", client: "C3 - Bhaveshbhai", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 50 },
-      { id: "TR_1003", client: "C4 - Hiteshbhai", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 200 }
+      { id: "TR_1001", client: "R1 - Rameshbhai", branch: "rajkot", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 100 },
+      { id: "TR_1002", client: "N1 - Bhaveshbhai", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 50 },
+      { id: "TR_1003", client: "N2 - Hiteshbhai", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 200 }
     ];
 
     function verifyLogin() {
@@ -358,7 +447,7 @@
         document.getElementById('btnAdminPool').style.display = 'none';
         document.getElementById('branchField').style.display = 'none';
         document.getElementById('adminPinField').style.display = 'none';
-        document.getElementById('manageTitle').innerText = "➕ Add Client (Surat Branch)";
+        document.getElementById('manageTitle').innerText = "➕ Add Client (Surat Branch - 'N' Series)";
       } else {
         document.getElementById('branchBadge').innerText = "HO: RAJKOT";
         document.getElementById('branchBadge').className = "branch-badge admin-badge";
@@ -378,11 +467,14 @@
       renderClientsList();
     }
 
-    // Smart Gap-Filling Client ID Auto Generator
+    // Branch Prefix Gap-Filling ID Generator (R for Rajkot, N for Nareshbhai Surat)
     function autoGenerateClientId() {
+      const branch = userRole === 'admin' ? document.getElementById('newClientBranch').value : 'surat';
+      const prefix = branch === 'rajkot' ? 'R' : 'N';
+      
       const numbers = [];
-      clients.forEach(c => {
-        const num = parseInt(c.id.replace('C', ''));
+      clients.filter(c => c.id.startsWith(prefix)).forEach(c => {
+        const num = parseInt(c.id.replace(prefix, ''));
         if (!isNaN(num)) numbers.push(num);
       });
       numbers.sort((a, b) => a - b);
@@ -392,10 +484,10 @@
         if (n === candidate) {
           candidate++;
         } else if (n > candidate) {
-          break; // Found recycled gap
+          break; // Recycled Gap Found!
         }
       }
-      document.getElementById('newClientId').value = `C${candidate}`;
+      document.getElementById('newClientId').value = `${prefix}${candidate}`;
     }
 
     function toggleExpiry(type) {
@@ -522,6 +614,7 @@
         tbody.innerHTML += `<tr>
           <td><b>${c.id}</b></td>
           <td>${c.name}</td>
+          <td>${c.branch.toUpperCase()}</td>
           <td>${c.rate}%</td>
           <td><button class="btn-cancel" onclick="removeClient('${c.id}')">Exit / Remove</button></td>
         </tr>`;
