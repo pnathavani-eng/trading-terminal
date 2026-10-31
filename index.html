@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="gu">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +17,7 @@
       position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #060913;
       display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px;
     }
-    .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px 20px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.7); }
+    .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px 20px; width: 100%; max-width: 340px; text-align: center; }
     .login-box h2 { margin-bottom: 6px; color: #38bdf8; font-size: 19px; }
     
     .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
@@ -35,6 +35,7 @@
     .full-width { grid-column: span 2; }
     label { font-size: 11px; color: var(--muted); margin-bottom: 3px; display: block; }
     input, select { width: 100%; background: #090d1a; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; outline: none; }
+    input:read-only { background: #1a233a; color: #38bdf8; font-weight: bold; cursor: not-allowed; }
     
     .search-container { position: relative; }
     .search-results {
@@ -65,21 +66,21 @@
 </head>
 <body>
 
-  <!-- સુરક્ષા લોગિન (કોઈ પાસવર્ડ લખેલો નથી) -->
+  <!-- Security Login -->
   <div id="loginScreen">
     <div class="login-box">
       <h2>🔐 NSE F&O Terminal</h2>
-      <p style="color:var(--muted); font-size:12px; margin: 8px 0 18px;">સુરક્ષા PIN દાખલ કરો</p>
+      <p style="color:var(--muted); font-size:12px; margin: 8px 0 18px;">Enter Security PIN</p>
       <input type="password" id="pinInput" placeholder="••••" style="text-align:center; font-size:24px; letter-spacing:8px; margin-bottom:14px;" pattern="[0-9]*" inputmode="numeric">
-      <button class="btn btn-primary" onclick="verifyLogin()">લોગિન</button>
+      <button class="btn btn-primary" onclick="verifyLogin()">Login</button>
     </div>
   </div>
 
-  <!-- હેડર -->
+  <!-- Header -->
   <div class="header">
     <div>
       <h2 style="font-size: 17px;" id="mainTitle">NSE F&O Terminal</h2>
-      <small id="subHeader" style="color:var(--muted)">મુખ્ય બ્રાન્ચ</small>
+      <small id="subHeader" style="color:var(--muted)">Rajkot HQ</small>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
       <span id="branchBadge" class="branch-badge admin-badge">HO: RAJKOT</span>
@@ -87,58 +88,57 @@
     </div>
   </div>
 
-  <!-- નેવિગેશન ટેબ્સ -->
+  <!-- Tabs Navigation -->
   <div class="nav-tabs">
-    <button class="tab-btn active" onclick="switchTab('terminalTab')">📈 ટ્રેડિંગ ટર્મિનલ</button>
+    <button class="tab-btn active" onclick="switchTab('terminalTab')">📈 Trading Terminal</button>
     <button class="tab-btn" id="btnAdminPool" onclick="switchTab('poolTab')">🏛️ Master Pool</button>
-    <button class="tab-btn" onclick="switchTab('billingTab')">🧾 સાપ્તાહિક બિલિંગ</button>
-    <button class="tab-btn" id="btnManage" onclick="switchTab('manageTab')">👥 ક્લાયન્ટ ઉમેરો</button>
-    <button class="tab-btn" id="btnSettings" onclick="switchTab('settingsTab')">⚙️ PIN સેટિંગ્સ</button>
+    <button class="tab-btn" onclick="switchTab('billingTab')">🧾 Weekly Billing</button>
+    <button class="tab-btn" id="btnManage" onclick="switchTab('manageTab')">👥 Clients Manager</button>
+    <button class="tab-btn" id="btnSettings" onclick="switchTab('settingsTab')">⚙️ PIN Settings</button>
   </div>
 
-  <!-- ૧. ઓર્ડર એન્ટ્રી -->
+  <!-- TAB 1: Order Entry -->
   <div id="terminalTab" class="tab-content">
     <div class="card">
-      <div class="card-title">નવો સોદો (F&O Order Entry)</div>
+      <div class="card-title">New Order (F&O Entry)</div>
       <div class="form-grid">
         <div class="full-width">
-          <label>ક્લાયન્ટ પસંદ કરો</label>
+          <label>Select Client</label>
           <select id="clientSelect"></select>
         </div>
 
         <div class="full-width search-container">
-          <label>F&O સ્ટોક અને કોન્ટ્રાક્ટ</label>
-          <input type="text" id="stockSearch" placeholder="દા.ત. RELIANCE, TATASTEEL" oninput="filterStocks()" autocomplete="off">
+          <label>F&O Stock & Contract</label>
+          <input type="text" id="stockSearch" placeholder="e.g. RELIANCE, TATASTEEL" oninput="filterStocks()" autocomplete="off">
           <div id="searchResults" class="search-results"></div>
         </div>
 
-        <!-- ઓટોમેટિક કેલેન્ડર એક્સપાયરી સીરીઝ -->
         <div class="full-width">
-          <label>કોન્ટ્રાક્ટ એક્સપાયરી (આપોઆપ અપડેટ થશે)</label>
+          <label>Contract Expiry (Auto Calendar)</label>
           <div class="expiry-toggle">
-            <div class="exp-pill active" id="expCurrent" onclick="toggleExpiry('CURRENT')">કરન્ટ સીરીઝ</div>
-            <div class="exp-pill" id="expNext" onclick="toggleExpiry('NEXT')">નેક્સ્ટ સીરીઝ</div>
+            <div class="exp-pill active" id="expCurrent" onclick="toggleExpiry('CURRENT')">Current</div>
+            <div class="exp-pill" id="expNext" onclick="toggleExpiry('NEXT')">Next</div>
           </div>
         </div>
 
         <div>
-          <label>ક્વોન્ટિટી (Editable)</label>
+          <label>Quantity (Editable)</label>
           <input type="number" id="qtyInput" value="250">
         </div>
         <div>
-          <label id="priceLabel">ભાવ (FUT)</label>
+          <label id="priceLabel">Price (FUT)</label>
           <input type="number" id="priceInput" value="1175.00" step="0.05">
         </div>
       </div>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
-        <button class="btn btn-buy" onclick="placeOrder('BUY')">BUY (ખરીદો)</button>
-        <button class="btn btn-sell" onclick="placeOrder('SELL')">SELL (વેચો)</button>
+        <button class="btn btn-buy" onclick="placeOrder('BUY')">BUY</button>
+        <button class="btn btn-sell" onclick="placeOrder('SELL')">SELL</button>
       </div>
     </div>
 
-    <!-- ઓપન પોઝિશન્સ -->
+    <!-- Active Trades -->
     <div class="card">
-      <div class="card-title">ઓપન પોઝિશન્સ (Active Trades)</div>
+      <div class="card-title">Active Positions</div>
       <table>
         <thead>
           <tr>
@@ -154,7 +154,7 @@
     </div>
   </div>
 
-  <!-- ૨. માસ્ટર પુલ -->
+  <!-- TAB 2: Master Pool -->
   <div id="poolTab" class="tab-content" style="display:none;">
     <div class="card">
       <div class="card-title">
@@ -176,15 +176,15 @@
     </div>
   </div>
 
-  <!-- ૩. બિલિંગ -->
+  <!-- TAB 3: Weekly Billing -->
   <div id="billingTab" class="tab-content" style="display:none;">
     <div class="card">
-      <div class="card-title">સાપ્તાહિક MTM બિલિંગ (શુક્રવાર)</div>
+      <div class="card-title">Friday MTM Settlement</div>
       <table>
         <thead>
           <tr>
             <th>Client</th>
-            <th>Net Bill</th>
+            <th>Net Balance</th>
             <th>WhatsApp</th>
           </tr>
         </thead>
@@ -193,85 +193,95 @@
     </div>
   </div>
 
-  <!-- ૪. ક્લાયન્ટ ઉમેરો -->
+  <!-- TAB 4: Client Management & Smart Recycling -->
   <div id="manageTab" class="tab-content" style="display:none;">
     <div class="card">
-      <div class="card-title" id="manageTitle">➕ નવો ક્લાયન્ટ ઉમેરો</div>
+      <div class="card-title" id="manageTitle">➕ Add New Client</div>
       <div class="form-grid">
         <div>
-          <label>ક્લાયન્ટ ID</label>
-          <input type="text" id="newClientId" placeholder="દા.ત. C205">
+          <label>Client ID (Auto Assigned)</label>
+          <input type="text" id="newClientId" readonly>
         </div>
         <div>
-          <label>પૂરું નામ</label>
-          <input type="text" id="newClientName" placeholder="દા.ત. કલ્પેશભાઈ">
+          <label>Full Name</label>
+          <input type="text" id="newClientName" placeholder="Client Name">
         </div>
         <div class="full-width">
-          <label>મોબાઈલ નંબર (WhatsApp)</label>
+          <label>Mobile Number (WhatsApp)</label>
           <input type="text" id="newClientMobile" placeholder="98XXXXXXXX">
         </div>
         <div>
-          <label>બ્રોકરેજ રેટ (%)</label>
+          <label>Brokerage Rate (%)</label>
           <input type="number" id="newClientRate" value="0.01" step="0.005">
         </div>
         <div id="branchField">
-          <label>બ્રાન્ચ ટેગ</label>
-          <select id="newClientBranch">
-            <option value="rajkot">રાજકોટ મુખ્ય બ્રાન્ચ</option>
-            <option value="surat">સુરત શાખા (નરેશભાઈ)</option>
+          <label>Branch Tag</label>
+          <select id="newClientBranch" onchange="autoGenerateClientId()">
+            <option value="rajkot">Rajkot Head Office</option>
+            <option value="surat">Surat Branch (Nareshbhai)</option>
           </select>
         </div>
       </div>
-      <button class="btn btn-primary" onclick="addNewClient()">ક્લાયન્ટ સેવ કરો</button>
+      <button class="btn btn-primary" onclick="addNewClient()">Save Client</button>
+    </div>
+
+    <!-- Active Clients List with Exit Option -->
+    <div class="card">
+      <div class="card-title">Existing Clients (Directory)</div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Rate</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="clientsListBody"></tbody>
+      </table>
     </div>
   </div>
 
-  <!-- ૫. PIN સેટિંગ્સ ટેબ (સિક્યોરિટી) -->
+  <!-- TAB 5: PIN Settings -->
   <div id="settingsTab" class="tab-content" style="display:none;">
     <div class="card">
-      <div class="card-title">🔐 સુરક્ષા PIN બદલો</div>
+      <div class="card-title">🔐 Change Security PINs</div>
       <div class="form-grid">
         <div class="full-width" id="adminPinField">
-          <label>રાજકોટ Admin PIN (મુખ્ય પાસવર્ડ)</label>
-          <input type="password" id="newAdminPin" placeholder="નવો Admin PIN">
+          <label>Rajkot Admin PIN (Master PIN)</label>
+          <input type="password" id="newAdminPin" placeholder="New Admin PIN">
         </div>
         <div class="full-width">
-          <label>સુરત શાખા Operator PIN</label>
-          <input type="password" id="newSuratPin" placeholder="નવો સુરત શાખા PIN">
+          <label>Surat Branch Operator PIN</label>
+          <input type="password" id="newSuratPin" placeholder="New Surat Operator PIN">
         </div>
       </div>
-      <button class="btn btn-primary" onclick="saveNewPins()">PIN સેવ કરો</button>
+      <button class="btn btn-primary" onclick="saveNewPins()">Save PINs</button>
     </div>
   </div>
 
   <script>
-    // ડિફોલ્ટ પિન (જો અગાઉ બદલેલા ન હોય તો)
     let adminPin = localStorage.getItem('app_admin_pin') || "9999";
     let suratPin = localStorage.getItem('app_surat_pin') || "1111";
 
     let userRole = null;
-    let selectedExpiryType = 'CURRENT'; // 'CURRENT' અથવા 'NEXT'
+    let selectedExpiryType = 'CURRENT';
     let currentRawStock = 'RELIANCE';
 
-    // ૧. ગણતરી: NSE મહિનાનો છેલ્લો ગુરુવાર (ઓટોમેટિક એક્સપાયરી કેલેન્ડર)
+    // Auto NSE Last Thursday Expiry Generator
     function getNseExpiry(offsetMonths = 0) {
       const now = new Date();
       let targetYear = now.getFullYear();
       let targetMonth = now.getMonth() + offsetMonths;
-      
       if (targetMonth > 11) {
         targetYear += Math.floor(targetMonth / 12);
         targetMonth = targetMonth % 12;
       }
-      
-      // મહિનાનો છેલ્લો દિવસ
       const lastDay = new Date(targetYear, targetMonth + 1, 0);
       let day = lastDay.getDate();
-      // છેલ્લો ગુરુવાર (Thursday = 4 in JS getDay)
       while (new Date(targetYear, targetMonth, day).getDay() !== 4) {
         day--;
       }
-      
       const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
       return {
         formatted: `${day}-${monthNames[targetMonth]}-${targetYear}`,
@@ -279,10 +289,9 @@
       };
     }
 
-    let currentExp = getNseExpiry(0); // ચાલુ મહિનો
-    let nextExp = getNseExpiry(1);    // આવતો મહિનો
+    let currentExp = getNseExpiry(0);
+    let nextExp = getNseExpiry(1);
 
-    // NSE ૨૧૩+ ડેટાબેઝ
     const fnoDatabase = [
       { name: "RELIANCE", lot: 250, price: 1175.00 },
       { name: "TATASTEEL", lot: 550, price: 168.20 },
@@ -304,18 +313,18 @@
       { name: "BAJFINANCE", lot: 750, price: 6900.00 }
     ];
 
-    let clients = [
-      { id: "C101", name: "રમેશભાઈ", branch: "rajkot", phone: "9825012345", rate: 0.01, bal: -12.50 },
-      { id: "C102", name: "કિશોરભાઈ", branch: "rajkot", phone: "9898012345", rate: 0.02, bal: 0.00 },
-      { id: "C201", name: "ભાવેશભાઈ (સુરત)", branch: "surat", phone: "9825111111", rate: 0.01, bal: 1025.00 },
-      { id: "C202", name: "હિતેશભાઈ (સુરત)", branch: "surat", phone: "9825222222", rate: 0.01, bal: -250.00 },
-      { id: "C203", name: "વિજયભાઈ (સુરત)", branch: "surat", phone: "9825333333", rate: 0.01, bal: 450.00 }
+    let clients = JSON.parse(localStorage.getItem('app_clients')) || [
+      { id: "C1", name: "Rameshbhai", branch: "rajkot", phone: "9825012345", rate: 0.01, bal: -12.50 },
+      { id: "C2", name: "Kishorbhai", branch: "rajkot", phone: "9898012345", rate: 0.02, bal: 0.00 },
+      { id: "C3", name: "Bhaveshbhai", branch: "surat", phone: "9825111111", rate: 0.01, bal: 1025.00 },
+      { id: "C4", name: "Hiteshbhai", branch: "surat", phone: "9825222222", rate: 0.01, bal: -250.00 },
+      { id: "C5", name: "Vijaybhai", branch: "surat", phone: "9825333333", rate: 0.01, bal: 450.00 }
     ];
 
     let trades = [
-      { id: "TR_1001", client: "C101 - રમેશભાઈ", branch: "rajkot", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 100 },
-      { id: "TR_1002", client: "C201 - ભાવેશભાઈ", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 50 },
-      { id: "TR_1003", client: "C202 - હિતેશભાઈ", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 200 }
+      { id: "TR_1001", client: "C1 - Rameshbhai", branch: "rajkot", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 100 },
+      { id: "TR_1002", client: "C3 - Bhaveshbhai", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 50 },
+      { id: "TR_1003", client: "C4 - Hiteshbhai", branch: "surat", contract: "RELIANCE " + currentExp.monthCode + " FUT", action: "BUY", qty: 200 }
     ];
 
     function verifyLogin() {
@@ -329,7 +338,7 @@
         document.getElementById('loginScreen').style.display = 'none';
         initApp();
       } else {
-        alert("ખોટો PIN!");
+        alert("Invalid PIN!");
       }
     }
 
@@ -339,33 +348,54 @@
     }
 
     function initApp() {
-      // ઓટોમેટિક એક્સપાયરી બટન લેબલ સેટ કરવા
-      document.getElementById('expCurrent').innerText = `${currentExp.formatted} (કરન્ટ)`;
-      document.getElementById('expNext').innerText = `${nextExp.formatted} (નેક્સ્ટ)`;
+      document.getElementById('expCurrent').innerText = `${currentExp.formatted} (Cur)`;
+      document.getElementById('expNext').innerText = `${nextExp.formatted} (Next)`;
 
       if (userRole === 'sub_surat') {
-        document.getElementById('branchBadge').innerText = "BRANCH: SURAT (નરેશભાઈ)";
+        document.getElementById('branchBadge').innerText = "BRANCH: SURAT (Nareshbhai)";
         document.getElementById('branchBadge').className = "branch-badge sub-badge";
-        document.getElementById('subHeader').innerText = "સુરત શાખા (Operator Panel)";
+        document.getElementById('subHeader').innerText = "Surat Branch Operator";
         document.getElementById('btnAdminPool').style.display = 'none';
         document.getElementById('branchField').style.display = 'none';
         document.getElementById('adminPinField').style.display = 'none';
-        document.getElementById('manageTitle').innerText = "➕ સુરત શાખામાં નવો ક્લાયન્ટ ઉમેરો";
+        document.getElementById('manageTitle').innerText = "➕ Add Client (Surat Branch)";
       } else {
         document.getElementById('branchBadge').innerText = "HO: RAJKOT";
         document.getElementById('branchBadge').className = "branch-badge admin-badge";
-        document.getElementById('subHeader').innerText = "રાજકોટ મુખ્ય બ્રાન્ચ (Full Admin)";
+        document.getElementById('subHeader').innerText = "Rajkot HQ (Full Admin)";
         document.getElementById('btnAdminPool').style.display = 'block';
         document.getElementById('branchField').style.display = 'block';
         document.getElementById('adminPinField').style.display = 'block';
-        document.getElementById('manageTitle').innerText = "➕ નવો ક્લાયન્ટ ઉમેરો";
+        document.getElementById('manageTitle').innerText = "➕ Add New Client";
       }
 
+      autoGenerateClientId();
       updateContractDisplay();
       renderClients();
       renderTrades();
       renderMasterPool();
       renderBills();
+      renderClientsList();
+    }
+
+    // Smart Gap-Filling Client ID Auto Generator
+    function autoGenerateClientId() {
+      const numbers = [];
+      clients.forEach(c => {
+        const num = parseInt(c.id.replace('C', ''));
+        if (!isNaN(num)) numbers.push(num);
+      });
+      numbers.sort((a, b) => a - b);
+      
+      let candidate = 1;
+      for (let n of numbers) {
+        if (n === candidate) {
+          candidate++;
+        } else if (n > candidate) {
+          break; // Found recycled gap
+        }
+      }
+      document.getElementById('newClientId').value = `C${candidate}`;
     }
 
     function toggleExpiry(type) {
@@ -382,7 +412,7 @@
     function updateContractDisplay() {
       const activeCode = getActiveMonthCode();
       document.getElementById('stockSearch').value = `${currentRawStock} ${activeCode} FUT`;
-      document.getElementById('priceLabel').innerText = `ભાવ (${activeCode} FUT)`;
+      document.getElementById('priceLabel').innerText = `Price (${activeCode} FUT)`;
       
       const stock = fnoDatabase.find(s => s.name === currentRawStock);
       if (stock) {
@@ -434,7 +464,7 @@
       const select = document.getElementById('clientSelect');
       select.innerHTML = "";
       clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
-        select.innerHTML += `<option value="${c.id}">${c.id} - ${c.name} (${c.branch==='surat'?'સુરત':'રાજકોટ'}) [${c.rate}%]</option>`;
+        select.innerHTML += `<option value="${c.id}">${c.id} - ${c.name} (${c.branch.toUpperCase()}) [${c.rate}%]</option>`;
       });
     }
 
@@ -443,7 +473,7 @@
       tbody.innerHTML = "";
       trades.filter(t => userRole === 'admin' || t.branch === 'surat').forEach(t => {
         let actionBtn = userRole === 'admin'
-          ? `<button class="btn-cancel" onclick="adminDelete('${t.id}')">Admin Delete</button>`
+          ? `<button class="btn-cancel" onclick="adminDelete('${t.id}')">Delete</button>`
           : (t.cancelReq 
               ? `<span style="color:#f59e0b; font-size:11px;">Cancel Pending</span>`
               : `<button class="btn-req" onclick="requestCancel('${t.id}')">Request Cancel</button>`);
@@ -475,7 +505,7 @@
       const tbody = document.getElementById('billsBody');
       tbody.innerHTML = "";
       clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
-        const msg = encodeURIComponent(`*શુક્રવાર MTM હિસાબ બિલ*\nક્લાયન્ટ: ${c.name} (${c.id})\nબ્રોકરેજ: ${c.rate}%\nચૂકવવાપાત્ર આખરી બેલેન્સ: ₹${c.bal.toFixed(2)}`);
+        const msg = encodeURIComponent(`*Friday MTM Statement*\nClient: ${c.name} (${c.id})\nBrokerage: ${c.rate}%\nClosing Balance: ₹${c.bal.toFixed(2)}`);
         const waLink = `https://wa.me/91${c.phone}?text=${msg}`;
         tbody.innerHTML += `<tr>
           <td>${c.name} (${c.rate}%)</td>
@@ -485,6 +515,30 @@
       });
     }
 
+    function renderClientsList() {
+      const tbody = document.getElementById('clientsListBody');
+      tbody.innerHTML = "";
+      clients.filter(c => userRole === 'admin' || c.branch === 'surat').forEach(c => {
+        tbody.innerHTML += `<tr>
+          <td><b>${c.id}</b></td>
+          <td>${c.name}</td>
+          <td>${c.rate}%</td>
+          <td><button class="btn-cancel" onclick="removeClient('${c.id}')">Exit / Remove</button></td>
+        </tr>`;
+      });
+    }
+
+    function removeClient(id) {
+      if (confirm(`Remove client ${id}? Their ID will be recycled for the next new client.`)) {
+        clients = clients.filter(c => c.id !== id);
+        localStorage.setItem('app_clients', JSON.stringify(clients));
+        renderClients();
+        renderClientsList();
+        renderBills();
+        autoGenerateClientId();
+      }
+    }
+
     function addNewClient() {
       const id = document.getElementById('newClientId').value.trim();
       const name = document.getElementById('newClientName').value.trim();
@@ -492,15 +546,18 @@
       const rate = parseFloat(document.getElementById('newClientRate').value) || 0.01;
       const branch = userRole === 'admin' ? document.getElementById('newClientBranch').value : 'surat';
 
-      if (!id || !name) return alert("કૃપા કરીને ID અને નામ ભરો!");
+      if (!name) return alert("Please enter Client Name!");
       clients.push({ id, name, branch, phone: mobile, rate: rate, bal: 0 });
-      alert(`નવો ક્લાયન્ટ ${name} (બ્રોકરેજ: ${rate}%) ઉમેરાયો.`);
+      localStorage.setItem('app_clients', JSON.stringify(clients));
       
-      document.getElementById('newClientId').value = '';
+      alert(`Client ${name} registered under ${id} successfully!`);
+      
       document.getElementById('newClientName').value = '';
       document.getElementById('newClientMobile').value = '';
       
+      autoGenerateClientId();
       renderClients();
+      renderClientsList();
       renderBills();
       switchTab('terminalTab');
     }
@@ -517,7 +574,7 @@
         suratPin = newSrt;
         localStorage.setItem('app_surat_pin', newSrt);
       }
-      alert("સુરક્ષા PIN સફળતાપૂર્વક અપડેટ થઈ ગયા!");
+      alert("Security PINs updated successfully!");
     }
 
     function placeOrder(action) {
@@ -525,7 +582,7 @@
       const contract = document.getElementById('stockSearch').value;
       const qty = document.getElementById('qtyInput').value;
       const price = document.getElementById('priceInput').value;
-      if (!contract) return alert("કૃપા કરીને સ્ટોક પસંદ કરો!");
+      if (!contract) return alert("Please select a stock!");
 
       trades.push({
         id: "TR_" + new Date().getTime(),
@@ -535,18 +592,18 @@
         action: action,
         qty: qty
       });
-      alert(`સોદો સેવ થયો:\nકોન્ટ્રાક્ટ: ${contract}\nજથ્થો: ${qty} @ ₹${price}`);
+      alert(`Order Placed:\nContract: ${contract}\nQuantity: ${qty} @ ₹${price}`);
       renderTrades();
     }
 
     function adminDelete(id) {
-      const pin = prompt("સોદો રદ કરવા માટે Master PIN નાખો:");
+      const pin = prompt("Enter Master PIN to delete trade:");
       if (pin === adminPin) {
         trades = trades.filter(t => t.id !== id);
-        alert("સોદો રદ થયો અને બ્રોકરેજ રિવર્સ થઈ.");
+        alert("Trade canceled and brokerage reversed.");
         renderTrades();
       } else if (pin !== null) {
-        alert("ખોટો PIN!");
+        alert("Incorrect PIN!");
       }
     }
 
@@ -554,7 +611,7 @@
       const t = trades.find(x => x.id === id);
       if (t) {
         t.cancelReq = true;
-        alert("સોદો રદ કરવાની વિનંતી મુખ્ય બ્રાન્ચ રાજકોટને મોકલાઈ ગઈ છે.");
+        alert("Cancellation request sent to Rajkot HO.");
         renderTrades();
       }
     }
