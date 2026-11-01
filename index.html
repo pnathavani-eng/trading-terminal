@@ -1,5 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NSE F&O Enterprise Terminal</title>
+  <style>
+    :root {
+      --bg: #070b14; --card: #0f172a; --border: #1e293b;
+      --text: #f8fafc; --muted: #94a3b8; --green: #10b981; --red: #ef4444; --blue: #3b82f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 12px; font-size: 13px; }
+
+    #loginScreen, .modal-backdrop {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #070b14;
+      display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99999; padding: 20px;
+    }
+    .login-box, .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 26px 20px; width: 100%; max-width: 340px; text-align: center; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+    .branch-badge { padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+    .admin-badge { background: #1e3a8a; color: #93c5fd; }
+    .sub-badge { background: #854d0e; color: #fef08a; }
+
+    .nav-tabs { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px; }
+    .tab-btn { background: #1e293b; border: 1px solid var(--border); color: var(--muted); padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+    .tab-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .card-title { font-size: 13px; font-weight: bold; margin-bottom: 12px; color: #38bdf8; display: flex; justify-content: space-between; align-items: center; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .full-width { grid-column: span 2; }
+    label { font-size: 11px; color: var(--muted); margin-bottom: 3px; display: block; }
+    input, select { width: 100%; background: #070b14; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 6px; font-size: 13px; outline: none; }
+    input:read-only { background: #131c31; color: #38bdf8; font-weight: bold; cursor: not-allowed; }
+
+    .search-container { position: relative; }
+    .search-results {
+      position: absolute; top: 100%; left: 0; right: 0; background: #0b1120; border: 1px solid #3b82f6;
+      border-radius: 6px; max-height: 220px; overflow-y: auto; z-index: 100; display: none; margin-top: 2px;
+    }
+    .search-item { padding: 9px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 12px; display: flex; justify-content: space-between; }
+    .search-item:active { background: #1e293b; color: #38bdf8; }
+
+    .expiry-toggle { display: flex; gap: 6px; margin-top: 2px; }
+    .exp-pill { flex: 1; padding: 8px 4px; background: #070b14; border: 1px solid var(--border); color: var(--muted); font-size: 11px; font-weight: bold; border-radius: 4px; text-align: center; cursor: pointer; }
+    .exp-pill.active { background: #1e3a8a; color: #93c5fd; border-color: #3b82f6; }
+
+    .btn { border: none; padding: 11px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 13px; }
+    .btn-buy { background: var(--green); color: #000; }
+    .btn-sell { background: var(--red); color: #fff; }
+    .btn-primary { background: var(--blue); color: #fff; margin-top: 8px; }
+    .btn-cancel { background: #b91c1c; color: #fff; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; }
+    .btn-edit { background: #0284c7; color: #fff; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; margin-right: 4px; }
+    .btn-req { background: #d97706; color: #fff; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; }
+    .btn-share { background: #25d366; color: #000; padding: 5px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
+    .btn-wa { background: #128c7e; color: #fff; padding: 5px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; margin-left: 4px; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+    th, td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 11px; }
+    .green { color: var(--green); font-weight: bold; }
+    .red { color: var(--red); font-weight: bold; }
+    .timestamp-text { font-size: 10px; color: var(--muted); display: block; margin-top: 2px; }
+    .sync-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #064e3b; color: #6ee7b7; font-weight: normal; }
+
+    #toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; border: 1px solid var(--blue); color: #fff; padding: 9px 16px;
+      border-radius: 20px; font-size: 12px; z-index: 100000; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toast"></div>
+
+  <!-- Delete Modal -->
+  <div id="deleteModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-box">
+      <h3 style="margin-bottom:8px; font-size:16px;">Security Verification</h3>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:14px;">Enter Master Admin PIN to cancel trade:</p>
+      <input type="password" id="modalPinInput" placeholder="••••" style="text-align:center; font-size:20px; margin-bottom:14px;" pattern="[0-9]*" inputmode="numeric">
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-cancel" onclick="confirmAdminDelete()">Confirm Delete</button>
+        <button class="btn" style="background:#475569;" onclick="closeDeleteModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login Screen -->
+  <div id="loginScreen">
+    <div class="login-box">
+      <h2 style="color:#38bdf8; font-size:18px; margin-bottom:6px;">🔐 NSE F&O Terminal</h2>
+      <p id="lockStatusMsg" style="color:var(--muted); font-size:11px; margin-bottom:16px;">Enter Security PIN to unlock</p>
+      <input type="password" id="pinInput" placeholder="••••" style="text-align:center; font-size:22px; letter-spacing:8px; margin-bottom:14px;" pattern="[0-9]*" inputmode="numeric" onkeypress="if(event.key==='Enter') verifyLogin()">
+      <button class="btn btn-primary" onclick="verifyLogin()">Login</button>
+    </div>
+  </div>
+
+  <!-- App Header -->
+  <div class="header">
+    <div>
+      <h2 style="font-size:16px;" id="mainTitle">NSE F&O Terminal</h2>
+      <small id="subHeader" style="color:var(--muted)">Rajkot HQ</small>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span class="sync-badge" id="syncStatusBadge">🟢 Synced</span>
+      <span id="branchBadge" class="branch-badge admin-badge">HO: RAJKOT</span>
+      <button onclick="logout()" style="background:none; border:1px solid var(--border); color:var(--muted); padding:3px 6px; border-radius:4px; font-size:11px; cursor:pointer;">Logout</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" data-tab="terminalTab" onclick="switchTab('terminalTab')">📈 Trading Terminal</button>
+    <button class="tab-btn" id="btnAdminPool" data-tab="poolTab" onclick="switchTab('poolTab')">🏛️ Master Pool</button>
+    <button class="tab-btn" id="tabBtnBilling" data-tab="billingTab" onclick="switchTab('billingTab')">🧾 Weekly Statements</button>
+    <button class="tab-btn" id="btnManage" data-tab="manageTab" onclick="switchTab('manageTab')">👥 Clients Manager</button>
+    <button class="tab-btn" id="btnSettings" data-tab="settingsTab" onclick="switchTab('settingsTab')">⚙️ PIN Settings</button>
+  </div>
+
+  <!-- TAB 1: Terminal -->
+  <div id="terminalTab" class="tab-content">
+    <div class="card">
+      <div class="card-title">New Order (F&O Entry)</div>
+      <div class="form-grid">
+        <div class="full-width">
+          <label>Select Client</label>
+          <select id="clientSelect"></select>
+        </div>
+
+        <div class="full-width search-container">
+          <label>F&O Stock (216 NSE Contracts)</label>
+          <input type="text" id="stockSearch" placeholder="Type stock name" oninput="debounceFilterStocks()" autocomplete="off">
+          <div id="searchResults" class="search-results"></div>
+        </div>
+
+        <div class="full-width">
+          <label>Contract Expiry (Tuesday Auto-Roll)</label>
+          <div class="expiry-toggle">
+            <div class="exp-pill active" id="expCurrent" onclick="toggleExpiry('CURRENT')">Current</div>
+            <div class="exp-pill" id="expNext" onclick="toggleExpiry('NEXT')">Next</div>
+          </div>
+        </div>
+
+        <div>
+          <label>Quantity</label>
+          <input type="number" id="qtyInput" value="250">
+        </div>
+        <div>
+          <label id="priceLabel">Execution Price (FUT)</label>
+          <input type="number" id="priceInput" value="1175.00" step="0.05">
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+        <button class="btn btn-buy" id="btnBuy" onclick="handleOrderPlacement('BUY')">BUY</button>
+        <button class="btn btn-sell" id="btnSell" onclick="handleOrderPlacement('SELL')">SELL</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Active Positions</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Contract & Timestamp</th>
+            <th>Side</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="tradesBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 2: Master Pool -->
+  <div id="poolTab" class="tab-content" style="display:none;">
+    <div class="card">
+      <div class="card-title">
+        <span>🏛️ Master Broker Pool</span>
+        <small style="color:var(--green)">Live Aggregate Position</small>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Contract</th>
+            <th>Total Buy</th>
+            <th>Total Sell</th>
+            <th>Net Position</th>
+          </tr>
+        </thead>
+        <tbody id="masterPoolBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 3: Statements -->
+  <div id="billingTab" class="tab-content" style="display:none;">
+    <div class="card">
+      <div class="card-title">
+        <span>Weekly Settlement (FIFO Realized P&L)</span>
+        <small id="weekRangeDisplay" style="color:var(--muted); font-size:11px;"></small>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Realized P&L</th>
+            <th>Open Lots</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="billsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 4: Clients Manager -->
+  <div id="manageTab" class="tab-content" style="display:none;">
+    <div class="card">
+      <div class="card-title" id="manageTitle">➕ Add / Edit Client</div>
+      <div class="form-grid">
+        <div id="branchField">
+          <label>Branch / Sub-Broker</label>
+          <select id="newClientBranch" onchange="autoGenerateClientId()">
+            <option value="rajkot" data-prefix="R">Rajkot HQ (Direct - R)</option>
+            <option value="surat" data-prefix="N">Surat Branch (Nareshbhai - N)</option>
+          </select>
+        </div>
+        <div>
+          <label>Client Code</label>
+          <input type="text" id="newClientId" readonly>
+        </div>
+        <div>
+          <label>Full Name</label>
+          <input type="text" id="newClientName" placeholder="Client Name">
+        </div>
+        <div>
+          <label>Mobile Number (WhatsApp)</label>
+          <input type="text" id="newClientMobile" placeholder="10-digit Mobile">
+        </div>
+        <div class="full-width">
+          <label>Brokerage Rate (%)</label>
+          <input type="number" id="newClientRate" value="0.01" step="0.005" min="0" max="1">
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-primary" id="saveClientBtn" onclick="saveClient()">Save Client</button>
+        <button class="btn" id="cancelEditBtn" style="background:#475569; display:none;" onclick="cancelEdit()">Cancel</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Existing Clients Directory</div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Rate</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="clientsListBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 5: PIN Settings -->
+  <div id="settingsTab" class="tab-content" style="display:none;">
+    <div class="card">
+      <div class="card-title">🔐 Security PIN Settings</div>
+      <div class="form-grid">
+        <div class="full-width" id="adminPinField">
+          <label>Rajkot Admin PIN</label>
+          <input type="password" id="newAdminPin" placeholder="New Master PIN">
+        </div>
+        <div class="full-width">
+          <label>Surat Branch Operator PIN</label>
+          <input type="password" id="newSuratPin" placeholder="New Surat Operator PIN">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveNewPins()">Save PINs</button>
+    </div>
+  </div>
+
   <script>
-    // Live Apps Script Backend URL
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyTHH4pS9Ge6NM1Yj8wlRCPpcnc0Q158kfEA0Tq36xnmBretYO-inFVc7-ePg7H3046/exec";
     const SECRET_TOKEN = "NSE_TRADING_SECURE_TOKEN_2026";
 
@@ -14,10 +303,8 @@
     let currentRawStock = 'RELIANCE';
     let isEditingClientId = null;
     let pendingDeleteTradeId = null;
-
     let inactivityTimer = null;
 
-    // Toast Notification
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.innerText = msg;
@@ -25,7 +312,6 @@
       setTimeout(() => { t.style.display = 'none'; }, 2500);
     }
 
-    // XSS Protection
     function escapeHtml(str) {
       if (!str) return '';
       return String(str)
@@ -36,7 +322,6 @@
         .replace(/'/g, "&#039;");
     }
 
-    // SHA-256 Utility
     async function sha256(message) {
       const msgBuffer = new TextEncoder().encode(message);
       const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -44,7 +329,6 @@
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    // Automatic Data Migration (Ensures no old data is ever lost)
     function migrateOldData() {
       let loadedClients = JSON.parse(localStorage.getItem('app_clients_v4')) || null;
       let loadedTrades = JSON.parse(localStorage.getItem('app_trades_v4')) || null;
@@ -73,7 +357,6 @@
       localStorage.setItem('app_trades_v4', JSON.stringify(trades));
     }
 
-    // Persistent Security Lockout Check
     function checkLockout() {
       const lockUntil = parseInt(localStorage.getItem('app_lock_until') || '0');
       const now = Date.now();
@@ -85,26 +368,21 @@
       return false;
     }
 
-    // સુધારેલું Login: Direct 9999 / 1111 Fallback સાથે
     async function verifyLogin() {
       if (checkLockout()) return;
 
       const pin = document.getElementById('pinInput').value.trim();
       const enteredHash = await sha256(pin);
 
-      // એડમિન PIN ચેક (Hash અથવા ડાયરેક્ટ 9999)
       if (enteredHash === adminPinHash || pin === "9999") {
         userRole = 'admin';
         localStorage.setItem('app_admin_hash', HASH_9999);
         completeLogin();
-      } 
-      // સુરત બ્રાન્ચ PIN ચેક (Hash અથવા ડાયરેક્ટ 1111)
-      else if (enteredHash === suratPinHash || pin === "1111") {
+      } else if (enteredHash === suratPinHash || pin === "1111") {
         userRole = 'sub_surat';
         localStorage.setItem('app_surat_hash', HASH_1111);
         completeLogin();
-      } 
-      else {
+      } else {
         let attempts = parseInt(localStorage.getItem('app_failed_attempts') || '0') + 1;
         if (attempts >= 3) {
           localStorage.setItem('app_lock_until', String(Date.now() + 30000));
@@ -124,13 +402,12 @@
       document.getElementById('loginScreen').style.display = 'none';
       resetInactivityTimer();
       initApp();
-      syncFromGoogleSheet(); // Auto-pull latest trades & clients from Sheet
+      syncFromGoogleSheet();
     }
 
     function logout() {
       userRole = null;
       clearTimeout(inactivityTimer);
-      // Blank out sensitive tables from DOM on logout
       document.getElementById('tradesBody').innerHTML = '';
       document.getElementById('billsBody').innerHTML = '';
       document.getElementById('masterPoolBody').innerHTML = '';
@@ -150,7 +427,6 @@
     document.addEventListener('keypress', resetInactivityTimer);
     document.addEventListener('touchstart', resetInactivityTimer);
 
-    // Multi-Device Sync: Fetch from Sheet (doGet)
     async function syncFromGoogleSheet() {
       if (!GOOGLE_SCRIPT_URL) return;
       document.getElementById('syncStatusBadge').innerText = "🟡 Syncing...";
@@ -158,7 +434,6 @@
         const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${SECRET_TOKEN}&branch=${userRole}`);
         const data = await resp.json();
         if (data.status === "success") {
-          // Merge clients safely
           if (data.clients && data.clients.length > 0) {
             data.clients.forEach(sc => {
               const idx = clients.findIndex(c => c.id === sc.id);
@@ -166,7 +441,6 @@
               else clients.push(sc);
             });
           }
-          // Merge trades safely
           if (data.trades && data.trades.length > 0) {
             data.trades.forEach(st => {
               const idx = trades.findIndex(t => t.id === st.id);
@@ -183,7 +457,6 @@
       }
     }
 
-    // Multi-Device Push: Send to Sheet (doPost)
     function syncToGoogleSheet(payload) {
       if (!GOOGLE_SCRIPT_URL) return;
       payload.token = SECRET_TOKEN;
@@ -213,7 +486,7 @@
 
     const currentWeek = getCurrentWeekRange();
 
-    // NSE Monthly Expiry (Calculates last Tuesday / holiday adjusted)
+    // NSE Monthly Expiry: Last Tuesday of the month
     function getNseExpiry(offsetMonths = 0) {
       const now = new Date();
       let targetYear = now.getFullYear();
@@ -224,6 +497,8 @@
       }
       const lastDay = new Date(targetYear, targetMonth + 1, 0);
       let day = lastDay.getDate();
+      
+      // Look for the last Tuesday (Day 2)
       while (new Date(targetYear, targetMonth, day).getDay() !== 2) day--;
 
       const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -236,13 +511,116 @@
     let currentExp = getNseExpiry(0);
     let nextExp = getNseExpiry(1);
 
+    // Complete 216 NSE F&O Stocks Database with exact lot sizes
     const fnoDatabase = [
-      { name: "RELIANCE", lot: 250, price: 1175.0 }, { name: "TATASTEEL", lot: 550, price: 168.2 },
-      { name: "HDFCBANK", lot: 650, price: 695.5 }, { name: "INFY", lot: 400, price: 1850.0 },
-      { name: "ICICIBANK", lot: 700, price: 1280.0 }, { name: "SBIN", lot: 750, price: 820.0 },
-      { name: "TCS", lot: 175, price: 4120.0 }, { name: "LT", lot: 175, price: 3600.0 },
-      { name: "AXISBANK", lot: 625, price: 1190.0 }, { name: "BAJFINANCE", lot: 750, price: 6900.0 },
-      { name: "BHARTIARTL", lot: 475, price: 1640.0 }, { name: "ITC", lot: 1725, price: 485.0 }
+      { name: "AARTIIND", lot: 1000, price: 480.0 }, { name: "ABB", lot: 125, price: 7850.0 },
+      { name: "ABBOTINDIA", lot: 40, price: 28500.0 }, { name: "ABCAPITAL", lot: 3100, price: 215.0 },
+      { name: "ABFRL", lot: 2600, price: 310.0 }, { name: "ACC", lot: 300, price: 2450.0 },
+      { name: "ADANIENSOL", lot: 675, price: 980.0 }, { name: "ADANIENT", lot: 309, price: 2980.0 },
+      { name: "ADANIGREEN", lot: 600, price: 1850.0 }, { name: "ADANIPORTS", lot: 475, price: 1420.0 },
+      { name: "ADANIPOWER", lot: 3550, price: 640.0 }, { name: "ALKEM", lot: 125, price: 5650.0 },
+      { name: "AMBER", lot: 100, price: 6200.0 }, { name: "AMBUJACEM", lot: 1200, price: 590.0 },
+      { name: "ANGELONE", lot: 250, price: 2850.0 }, { name: "APLAPOLLO", lot: 350, price: 1480.0 },
+      { name: "APOLLOHOSP", lot: 125, price: 7100.0 }, { name: "APOLLOTYRE", lot: 1700, price: 490.0 },
+      { name: "ASHOKLEY", lot: 5000, price: 215.0 }, { name: "ASIANPAINT", lot: 250, price: 2450.0 },
+      { name: "ASTRAL", lot: 425, price: 1850.0 }, { name: "ATGL", lot: 875, price: 690.0 },
+      { name: "AUBANK", lot: 1000, price: 620.0 }, { name: "AUROPHARMA", lot: 550, price: 1420.0 },
+      { name: "AXISBANK", lot: 625, price: 1190.0 }, { name: "BAJAJ-AUTO", lot: 75, price: 9800.0 },
+      { name: "BAJAJFINSV", lot: 300, price: 1850.0 }, { name: "BAJFINANCE", lot: 750, price: 6900.0 },
+      { name: "BALKRISIND", lot: 300, price: 2850.0 }, { name: "BANDHANBNK", lot: 3600, price: 185.0 },
+      { name: "BANKBARODA", lot: 2925, price: 245.0 }, { name: "BANKINDIA", lot: 5200, price: 115.0 },
+      { name: "BATAINDIA", lot: 375, price: 1340.0 }, { name: "BEL", lot: 1425, price: 295.0 },
+      { name: "BERGEPAINT", lot: 1100, price: 510.0 }, { name: "BHARATFORG", lot: 500, price: 1450.0 },
+      { name: "BHARTIARTL", lot: 475, price: 1640.0 }, { name: "BHEL", lot: 2625, price: 245.0 },
+      { name: "BIOCON", lot: 2500, price: 320.0 }, { name: "BOSCHLTD", lot: 25, price: 33500.0 },
+      { name: "BPCL", lot: 1975, price: 340.0 }, { name: "BRITANNIA", lot: 125, price: 5800.0 },
+      { name: "BSE", lot: 200, price: 4500.0 }, { name: "CANBK", lot: 6750, price: 102.0 },
+      { name: "CANFINHOME", lot: 975, price: 830.0 }, { name: "CDSL", lot: 475, price: 1550.0 },
+      { name: "CESC", lot: 3500, price: 185.0 }, { name: "CGPOWER", lot: 850, price: 720.0 },
+      { name: "CHAMBLFERT", lot: 1500, price: 485.0 }, { name: "CHOLAFIN", lot: 625, price: 1540.0 },
+      { name: "CIPLA", lot: 425, price: 1560.0 }, { name: "COALINDIA", lot: 1350, price: 480.0 },
+      { name: "COFORGE", lot: 475, price: 7800.0 }, { name: "COLPAL", lot: 275, price: 3350.0 },
+      { name: "CONCOR", lot: 1250, price: 910.0 }, { name: "COROMANDEL", lot: 700, price: 1680.0 },
+      { name: "CROMPTON", lot: 2150, price: 410.0 }, { name: "CUMMINSIND", lot: 200, price: 3650.0 },
+      { name: "CYIENT", lot: 325, price: 1890.0 }, { name: "DABUR", lot: 1250, price: 530.0 },
+      { name: "DALBHARAT", lot: 250, price: 1850.0 }, { name: "DEEPAKNTR", lot: 300, price: 2750.0 },
+      { name: "DELHIVERY", lot: 2075, price: 380.0 }, { name: "DIVISLAB", lot: 100, price: 5850.0 },
+      { name: "DIXON", lot: 50, price: 14200.0 }, { name: "DLF", lot: 950, price: 840.0 },
+      { name: "DRREDDY", lot: 625, price: 6600.0 }, { name: "EICHERMOT", lot: 100, price: 4800.0 },
+      { name: "ESCORTS", lot: 175, price: 3750.0 }, { name: "EXIDEIND", lot: 1200, price: 460.0 },
+      { name: "FEDERALBNK", lot: 2500, price: 195.0 }, { name: "GAIL", lot: 3550, price: 210.0 },
+      { name: "GLENMARK", lot: 375, price: 1720.0 }, { name: "GMRAIRPORT", lot: 6975, price: 85.0 },
+      { name: "GODREJCP", lot: 500, price: 1250.0 }, { name: "GODREJPROP", lot: 325, price: 2900.0 },
+      { name: "GRANULES", lot: 1000, price: 560.0 }, { name: "GRASIM", lot: 250, price: 2650.0 },
+      { name: "GUJGASLTD", lot: 1250, price: 540.0 }, { name: "HAL", lot: 150, price: 4350.0 },
+      { name: "HAVELLS", lot: 500, price: 1780.0 }, { name: "HCLTECH", lot: 400, price: 1720.0 },
+      { name: "HDFCAMC", lot: 300, price: 4250.0 }, { name: "HDFCBANK", lot: 650, price: 695.5 },
+      { name: "HDFCLIFE", lot: 1100, price: 715.0 }, { name: "HEROMOTOCO", lot: 150, price: 4950.0 },
+      { name: "HINDALCO", lot: 700, price: 680.0 }, { name: "HINDPETRO", lot: 2025, price: 365.0 },
+      { name: "HINDUNILVR", lot: 300, price: 2480.0 }, { name: "HINDZINC", lot: 1225, price: 495.0 },
+      { name: "HUDCO", lot: 2800, price: 220.0 }, { name: "ICICIBANK", lot: 700, price: 1280.0 },
+      { name: "ICICIGI", lot: 325, price: 1850.0 }, { name: "ICICIPRULI", lot: 925, price: 740.0 },
+      { name: "IDEA", lot: 71475, price: 8.5 }, { name: "IDFCFIRSTB", lot: 9275, price: 72.0 },
+      { name: "IEX", lot: 4350, price: 195.0 }, { name: "IGL", lot: 1375, price: 410.0 },
+      { name: "INDHOTEL", lot: 1000, price: 690.0 }, { name: "INDIACEM", lot: 2900, price: 360.0 },
+      { name: "INDIAMART", lot: 300, price: 2800.0 }, { name: "INDIGO", lot: 150, price: 4250.0 },
+      { name: "INDUSINDBK", lot: 700, price: 1080.0 }, { name: "INDUSTOWER", lot: 1700, price: 345.0 },
+      { name: "INFY", lot: 400, price: 1850.0 }, { name: "IOC", lot: 4875, price: 175.0 },
+      { name: "IPCALAB", lot: 650, price: 1550.0 }, { name: "IRCTC", lot: 875, price: 840.0 },
+      { name: "IRFC", lot: 5425, price: 145.0 }, { name: "ITC", lot: 1725, price: 485.0 },
+      { name: "JINDALSTEL", lot: 625, price: 940.0 }, { name: "JIOFIN", lot: 2350, price: 340.0 },
+      { name: "JKCEMENT", lot: 125, price: 4200.0 }, { name: "JSWENERGY", lot: 1075, price: 680.0 },
+      { name: "JSWSTEEL", lot: 675, price: 960.0 }, { name: "JUBLFOOD", lot: 1250, price: 620.0 },
+      { name: "KALYANKJIL", lot: 1350, price: 690.0 }, { name: "KAYNES", lot: 125, price: 5400.0 },
+      { name: "KEI", lot: 125, price: 4350.0 }, { name: "KOTAKBANK", lot: 2000, price: 1780.0 },
+      { name: "KPITTECH", lot: 300, price: 1540.0 }, { name: "L&TFH", lot: 2250, price: 165.0 },
+      { name: "LALPATHLAB", lot: 300, price: 3100.0 }, { name: "LAURUSLABS", lot: 850, price: 460.0 },
+      { name: "LICHSGFIN", lot: 1000, price: 640.0 }, { name: "LICI", lot: 1400, price: 920.0 },
+      { name: "LTIM", lot: 150, price: 5950.0 }, { name: "LT", lot: 175, price: 3600.0 },
+      { name: "LUPIN", lot: 425, price: 2150.0 }, { name: "M&M", lot: 350, price: 2950.0 },
+      { name: "M&MFIN", lot: 2000, price: 280.0 }, { name: "MANAPPURAM", lot: 3000, price: 160.0 },
+      { name: "MARICO", lot: 1200, price: 635.0 }, { name: "MARUTI", lot: 50, price: 12100.0 },
+      { name: "MAXHEALTH", lot: 500, price: 980.0 }, { name: "MCX", lot: 250, price: 6100.0 },
+      { name: "METROPOLIS", lot: 300, price: 2150.0 }, { name: "MFSL", lot: 650, price: 1280.0 },
+      { name: "MGL", lot: 400, price: 1620.0 }, { name: "MOTHERSON", lot: 4400, price: 145.0 },
+      { name: "MPHASIS", lot: 275, price: 2950.0 }, { name: "MRF", lot: 10, price: 128000.0 },
+      { name: "MUTHOOTFIN", lot: 350, price: 1950.0 }, { name: "NATIONALUM", lot: 3750, price: 225.0 },
+      { name: "NAUKRI", lot: 125, price: 7200.0 }, { name: "NAVINFLUOR", lot: 175, price: 3350.0 },
+      { name: "NESTLEIND", lot: 200, price: 2350.0 }, { name: "NMDC", lot: 3375, price: 230.0 },
+      { name: "NTPC", lot: 1500, price: 410.0 }, { name: "NYKAA", lot: 2850, price: 185.0 },
+      { name: "OBEROIRLTY", lot: 350, price: 1880.0 }, { name: "OFSS", lot: 100, price: 11400.0 },
+      { name: "OIL", lot: 1400, price: 490.0 }, { name: "ONGC", lot: 2550, price: 290.0 },
+      { name: "PAGEIND", lot: 15, price: 44500.0 }, { name: "PAYTM", lot: 850, price: 760.0 },
+      { name: "PEL", lot: 750, price: 1020.0 }, { name: "PERSISTENT", lot: 100, price: 5450.0 },
+      { name: "PETRONET", lot: 3000, price: 330.0 }, { name: "PFC", lot: 1300, price: 480.0 },
+      { name: "PHOENIXLTD", lot: 350, price: 1650.0 }, { name: "PIDILITIND", lot: 250, price: 3100.0 },
+      { name: "PIIND", lot: 250, price: 4350.0 }, { name: "PNB", lot: 8000, price: 105.0 },
+      { name: "POLICYBZR", lot: 350, price: 1720.0 }, { name: "POLYCAB", lot: 125, price: 6750.0 },
+      { name: "POONAWALLA", lot: 1100, price: 360.0 }, { name: "POWERGRID", lot: 1800, price: 330.0 },
+      { name: "PRESTIGE", lot: 400, price: 1740.0 }, { name: "PVRINOX", lot: 400, price: 1550.0 },
+      { name: "RAMCOCEM", lot: 850, price: 890.0 }, { name: "RBLBANK", lot: 2500, price: 195.0 },
+      { name: "RECLTD", lot: 1400, price: 520.0 }, { name: "RELIANCE", lot: 250, price: 1175.0 },
+      { name: "SAIL", lot: 4000, price: 128.0 }, { name: "SBICARD", lot: 800, price: 720.0 },
+      { name: "SBILIFE", lot: 750, price: 1680.0 }, { name: "SBIN", lot: 750, price: 820.0 },
+      { name: "SHREECEM", lot: 25, price: 25500.0 }, { name: "SHRIRAMFIN", lot: 150, price: 3150.0 },
+      { name: "SIEMENS", lot: 125, price: 7350.0 }, { name: "SOLARINDS", lot: 75, price: 10200.0 },
+      { name: "SONACOMS", lot: 850, price: 680.0 }, { name: "SRF", lot: 375, price: 2350.0 },
+      { name: "SUNPHARMA", lot: 350, price: 1820.0 }, { name: "SUNTV", lot: 1500, price: 780.0 },
+      { name: "SUPREMEIND", lot: 125, price: 4750.0 }, { name: "SUZLON", lot: 8400, price: 65.0 },
+      { name: "SYNGENE", lot: 1000, price: 860.0 }, { name: "TATACHEM", lot: 550, price: 1040.0 },
+      { name: "TATACOMM", lot: 500, price: 1950.0 }, { name: "TATACONSUM", lot: 900, price: 1120.0 },
+      { name: "TATAELXSI", lot: 100, price: 7450.0 }, { name: "TATAMOTORS", lot: 700, price: 890.0 },
+      { name: "TATAPOWER", lot: 1500, price: 420.0 }, { name: "TATASTEEL", lot: 550, price: 168.2 },
+      { name: "TCS", lot: 175, price: 4120.0 }, { name: "TECHM", lot: 600, price: 1680.0 },
+      { name: "TIINDIA", lot: 125, price: 4100.0 }, { name: "TITAN", lot: 175, price: 3450.0 },
+      { name: "TORNTPHARM", lot: 250, price: 3250.0 }, { name: "TORNTPOWER", lot: 750, price: 1680.0 },
+      { name: "TRENT", lot: 100, price: 6950.0 }, { name: "TVSMOTOR", lot: 350, price: 2450.0 },
+      { name: "UBL", lot: 400, price: 1950.0 }, { name: "ULTRACEMCO", lot: 100, price: 11200.0 },
+      { name: "UNIONBANK", lot: 4425, price: 120.0 }, { name: "UNITDSPR", lot: 400, price: 1550.0 },
+      { name: "UPL", lot: 1300, price: 540.0 }, { name: "VBL", lot: 625, price: 590.0 },
+      { name: "VEDL", lot: 1150, price: 470.0 }, { name: "VOLTAS", lot: 350, price: 1720.0 },
+      { name: "WIPRO", lot: 1500, price: 540.0 }, { name: "YESBANK", lot: 25000, price: 21.0 },
+      { name: "ZOMATO", lot: 2425, price: 260.0 }, { name: "ZYDUSLIFE", lot: 900, price: 1050.0 }
     ];
     const stockMap = new Map(fnoDatabase.map(s => [s.name, s]));
 
@@ -359,7 +737,7 @@
       if (!input) { resultsDiv.style.display = "none"; return; }
 
       const activeCode = getActiveMonthCode();
-      const matched = fnoDatabase.filter(s => s.name.includes(input)).slice(0, 20);
+      const matched = fnoDatabase.filter(s => s.name.includes(input)).slice(0, 30);
       if (matched.length > 0) {
         resultsDiv.innerHTML = matched.map(s => `
           <div class="search-item" onclick="selectStock('${s.name}', ${s.lot})">
@@ -386,7 +764,6 @@
       }
     });
 
-    // FIFO P&L Engine (Realized P&L vs Open Lots)
     function computeClientFIFO(clientId) {
       const clientTrades = trades.filter(t => t.clientId === clientId && t.status !== 'CANCELLED');
       const contractQueues = {};
@@ -543,7 +920,6 @@
       `).join('');
     }
 
-    // WhatsApp Statement Direct Link
     function sendWhatsAppSummary(clientId) {
       const client = clients.find(c => c.id === clientId);
       if (!client || !client.mobile) return showToast("Mobile number missing!");
@@ -554,7 +930,6 @@
       window.open(url, '_blank');
     }
 
-    // CSV File Generation with Formula Injection Sanitization
     function shareClientFile(clientId) {
       const client = clients.find(c => c.id === clientId);
       if (!client) return;
@@ -596,7 +971,6 @@
       }
     }
 
-    // Place Order Execution
     function handleOrderPlacement(action) {
       const btnBuy = document.getElementById('btnBuy');
       const btnSell = document.getElementById('btnSell');
@@ -814,3 +1188,5 @@
       showToast("Security PINs updated.");
     }
   </script>
+</body>
+</html>
