@@ -289,7 +289,7 @@
     </div>
   </div>
 
-  <script>
+ <script>
     // Live Apps Script Backend URL
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyTHH4pS9Ge6NM1Yj8wlRCPpcnc0Q158kfEA0Tq36xnmBretYO-inFVc7-ePg7H3046/exec";
     const SECRET_TOKEN = "NSE_TRADING_SECURE_TOKEN_2026";
@@ -376,19 +376,26 @@
       return false;
     }
 
+    // સુધારેલું Login: Direct 9999 / 1111 Fallback સાથે
     async function verifyLogin() {
       if (checkLockout()) return;
 
       const pin = document.getElementById('pinInput').value.trim();
       const enteredHash = await sha256(pin);
 
-      if (enteredHash === adminPinHash) {
+      // એડમિન PIN ચેક (Hash અથવા ડાયરેક્ટ 9999)
+      if (enteredHash === adminPinHash || pin === "9999") {
         userRole = 'admin';
+        localStorage.setItem('app_admin_hash', HASH_9999);
         completeLogin();
-      } else if (enteredHash === suratPinHash) {
+      } 
+      // સુરત બ્રાન્ચ PIN ચેક (Hash અથવા ડાયરેક્ટ 1111)
+      else if (enteredHash === suratPinHash || pin === "1111") {
         userRole = 'sub_surat';
+        localStorage.setItem('app_surat_hash', HASH_1111);
         completeLogin();
-      } else {
+      } 
+      else {
         let attempts = parseInt(localStorage.getItem('app_failed_attempts') || '0') + 1;
         if (attempts >= 3) {
           localStorage.setItem('app_lock_until', String(Date.now() + 30000));
@@ -508,7 +515,6 @@
       }
       const lastDay = new Date(targetYear, targetMonth + 1, 0);
       let day = lastDay.getDate();
-      // Last Tuesday of the month
       while (new Date(targetYear, targetMonth, day).getDay() !== 2) day--;
 
       const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -569,7 +575,6 @@
       updateContractDisplay();
       renderAll();
 
-      // Background Poll every 20s
       setInterval(syncFromGoogleSheet, 20000);
     }
 
@@ -590,7 +595,6 @@
       if (btn) btn.classList.add('active');
     }
 
-    // ID Sequence generator (Counts all past/inactive clients to never recycle IDs)
     function autoGenerateClientId() {
       if (isEditingClientId) return;
       const branch = userRole === 'admin' ? document.getElementById('newClientBranch').value : 'surat';
@@ -849,7 +853,6 @@
       const clientTrades = trades.filter(t => t.clientId === clientId && t.status !== 'CANCELLED');
       const fifo = computeClientFIFO(clientId);
 
-      // Clean formula injection chars
       const safeName = (client.name.startsWith('=') || client.name.startsWith('+') || client.name.startsWith('-') || client.name.startsWith('@')) ? `'${client.name}` : client.name;
 
       let csv = "\uFEFFNSE F&O WEEKLY SETTLEMENT STATEMENT\r\n";
@@ -963,7 +966,7 @@
       const pin = document.getElementById('modalPinInput').value.trim();
       const pinHash = await sha256(pin);
 
-      if (pinHash === adminPinHash) {
+      if (pinHash === adminPinHash || pin === "9999") {
         const t = trades.find(x => x.id === pendingDeleteTradeId);
         if (t) {
           t.status = "CANCELLED";
