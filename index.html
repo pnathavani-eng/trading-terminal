@@ -137,6 +137,20 @@
     </div>
   </div>
 
+
+  <!-- Request Delete Modal (For Sub-Branches) -->
+  <div id="reqCancelModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-box">
+      <h3 style="margin-bottom:8px; font-size:16px; color:#f59e0b;">Request Trade Delete</h3>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Only Rajkot HQ Admin can delete trades. Enter reason for delete request:</p>
+      <input type="text" id="reqCancelReason" placeholder="e.g. Wrong stock / Wrong qty" style="margin-bottom:14px;">
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-req" style="padding:11px; font-size:13px;" onclick="confirmRequestCancel()">Send Request</button>
+        <button class="btn" style="background:#475569; color:#fff;" onclick="closeReqCancelModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Delete Trade Modal -->
   <div id="deleteModal" class="modal-backdrop" style="display:none;">
     <div class="modal-box">
@@ -251,6 +265,7 @@
           <button class="btn-edit" onclick="syncFromGoogleSheet()" style="margin:0;">Refresh Sheet</button>
         </div>
       </div>
+      <div id="pendingCancelBanner" style="display:none; background:#451a03; border:1px solid #d97706; color:#fde68a; padding:8px 10px; border-radius:6px; margin-bottom:10px; font-size:12px;"></div>
       <div class="form-grid" style="margin-bottom:8px;">
         <div>
           <select id="filterTradeBranch" onchange="renderTrades()">
@@ -590,14 +605,13 @@
           <input type="text" id="scriptFilterInput" placeholder="Type symbol to filter (e.g. ABB)" oninput="renderScriptsManager()">
         </div>
       </div>
-      <div class="table-wrap" style="max-height:240px; overflow-y:auto; margin-top:8px;">
-        <table>
+      <div class="table-wrap" style="max-height:260px; overflow-y:auto; margin-top:8px;">
+        <table style="min-width:100%;">
           <thead>
             <tr>
-              <th>Symbol</th>
-              <th>Lot</th>
+              <th>Symbol (Lot)</th>
               <th>Price</th>
-              <th>Action</th>
+              <th style="text-align:right;">Remove</th>
             </tr>
           </thead>
           <tbody id="scriptsListBody"></tbody>
@@ -920,6 +934,7 @@
                 netRate: netRate,
                 expiry: String(st.expiry || '').trim(),
                 status: String(st.status || 'OPEN').toUpperCase(),
+                cancelReason: String(st.cancelReason || st.cancel_reason || '').trim(),
                 cancelReq: String(st.status || '').toUpperCase() === 'PENDING_CANCEL' ||
                            String(st.cancellation_requested || '').toUpperCase() === 'YES' ||
                            String(st.cancellationRequested || '').toUpperCase() === 'REQUESTED'
@@ -1806,6 +1821,7 @@
         const mtmHtml = `<span class="${mtm >= 0 ? 'green' : 'red'}">${mtm >= 0 ? '+₹' : '-₹'}${Math.abs(mtm).toFixed(0)}</span>`;
 
         const isPendingCancel = t.cancelReq || t.status === 'PENDING_CANCEL';
+        const reasonNote = (isPendingCancel && t.cancelReason) ? `<span class="timestamp-text" style="color:#fde68a;">Reason: ${escapeHtml(t.cancelReason)}</span>` : '';
         let actionBtn = '';
         if (isAdmin) {
           actionBtn = isPendingCancel
@@ -1813,12 +1829,12 @@
             : `<button class="btn-cancel" onclick="openDeleteModal('${escapeHtml(t.id)}')">Delete</button>`;
         } else {
           actionBtn = isPendingCancel
-            ? `<span class="amber" style="font-size:11px;">Cancel Pending</span>`
-            : `<button class="btn-req" onclick="requestCancel('${escapeHtml(t.id)}')">Request Cancel</button>`;
+            ? `<span class="amber" style="font-size:11px;">Delete Pending</span>`
+            : `<button class="btn-req" onclick="openReqCancelModal('${escapeHtml(t.id)}')">Request Delete</button>`;
         }
 
         return `<tr>
-          <td><b>${escapeHtml(t.clientId)}</b> - ${escapeHtml(t.clientName)} <span class="branch-pill">${escapeHtml(normalizeBranch(t.branch).toUpperCase())}</span>${isPendingCancel ? '<span class="amber" style="font-size:10px; display:block;">CANCEL REQ</span>' : ''}</td>
+          <td><b>${escapeHtml(t.clientId)}</b> - ${escapeHtml(t.clientName)} <span class="branch-pill">${escapeHtml(normalizeBranch(t.branch).toUpperCase())}</span>${isPendingCancel ? '<span class="amber" style="font-size:10px; display:block;">DELETE REQUESTED</span>' : ''}${reasonNote}</td>
           <td><b>${escapeHtml(t.contract)}</b><span class="timestamp-text">${escapeHtml(t.timestamp)}</span></td>
           <td class="${t.action==='BUY'?'green':'red'}">${escapeHtml(t.action)}</td>
           <td>${t.qty}</td>
@@ -1829,6 +1845,16 @@
         </tr>`;
       }).join('');
 
+      const bannerEl = document.getElementById('pendingCancelBanner');
+      if (bannerEl) {
+        const pendingCount = getVisibleTrades().filter(x => x.cancelReq || x.status === 'PENDING_CANCEL').length;
+        if (isAdmin && pendingCount > 0) {
+          bannerEl.style.display = 'block';
+          bannerEl.innerHTML = `<b>Pending Delete Requests: ${pendingCount}</b> — Review & click <b>Approve Del</b> or <b>Keep</b> below.`;
+        } else {
+          bannerEl.style.display = 'none';
+        }
+      }
       if (totalMtmEl) {
         totalMtmEl.innerHTML = `(MTM: <span class="${totalMtm >= 0 ? 'green' : 'red'}">${totalMtm >= 0 ? '+₹' : '-₹'}${Math.abs(totalMtm).toFixed(0)}</span>)`;
       }
@@ -2209,21 +2235,35 @@
       }
     }
 
-    function requestCancel(tradeId) {
-      const t = trades.find(x => x.id === tradeId);
+    let pendingReqCancelTradeId = null;
+    function openReqCancelModal(tradeId) {
+      pendingReqCancelTradeId = tradeId;
+      document.getElementById('reqCancelReason').value = '';
+      document.getElementById('reqCancelModal').style.display = 'flex';
+    }
+    function closeReqCancelModal() {
+      pendingReqCancelTradeId = null;
+      document.getElementById('reqCancelModal').style.display = 'none';
+    }
+    function confirmRequestCancel() {
+      if (!pendingReqCancelTradeId) return;
+      const reasonText = document.getElementById('reqCancelReason').value.trim() || `Requested by ${currentSession.branchName}`;
+      const t = trades.find(x => x.id === pendingReqCancelTradeId);
+      closeReqCancelModal();
       if (t) {
         t.cancelReq = true;
         t.status = "PENDING_CANCEL";
+        t.cancelReason = reasonText;
         saveState();
 
         syncToGoogleSheet({
           action: "cancel_trade",
           id: t.id,
           status: "PENDING_CANCEL",
-          reason: `Cancellation Request by ${currentSession.branchName}`
+          reason: reasonText
         });
 
-        showToast("Cancellation request submitted.");
+        showToast("Delete request sent to Rajkot HQ.");
         renderTrades();
       }
     }
@@ -2395,10 +2435,9 @@
       const list = (q ? all.filter(s => s.name.includes(q)) : all).slice(0, 40);
       tbody.innerHTML = list.map(s => `
         <tr>
-          <td><b>${escapeHtml(s.name)}</b></td>
-          <td>${s.lot}</td>
+          <td><b>${escapeHtml(s.name)}</b> <small style="color:var(--muted);">(${s.lot})</small></td>
           <td>₹${Number(s.price).toFixed(2)}</td>
-          <td><button class="btn-cancel" onclick="deleteScript('${escapeHtml(s.name)}')">Delete</button></td>
+          <td style="text-align:right;"><button class="btn-cancel" onclick="deleteScript('${escapeHtml(s.name)}')">Delete</button></td>
         </tr>
       `).join('');
     }
