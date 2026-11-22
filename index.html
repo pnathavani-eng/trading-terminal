@@ -115,6 +115,25 @@
       max-width: 90%; text-align: center;
     }
 
+
+    .bill-modal-box {
+      background: #0f172a; border: 1px solid #334155; border-radius: 12px;
+      padding: 18px; width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto; text-align: left;
+    }
+    .bill-sheet {
+      background: #ffffff; color: #0f172a; border-radius: 8px; padding: 16px; font-size: 12px;
+    }
+    .bill-sheet table { min-width: 100%; margin-top: 6px; border-collapse: collapse; }
+    .bill-sheet th, .bill-sheet td { padding: 6px 5px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 11px; }
+    .bill-sheet th { background: #f1f5f9; color: #334155; font-weight: 700; }
+    .tag-intra { background: #dbeafe; color: #1e40af; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+    .tag-pos { background: #fef3c7; color: #92400e; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+    @media print {
+      body * { visibility: hidden; }
+      #billPrintableArea, #billPrintableArea * { visibility: visible; }
+      #billPrintableArea { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+
     @media (max-width: 480px) {
       .form-grid, .stat-grid { grid-template-columns: 1fr; }
       .full-width { grid-column: span 1; }
@@ -172,6 +191,23 @@
       <div style="display:flex; gap:8px;">
         <button class="btn btn-cancel" style="padding:11px; font-size:13px;" onclick="confirmSoftRemoveClient()">Yes, Remove</button>
         <button class="btn" style="background:#475569; color:#fff;" onclick="closeRemoveClientModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Weekly Bill Preview Modal -->
+  <div id="billPreviewModal" class="modal-backdrop" style="display:none;">
+    <div class="bill-modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="font-size:15px; color:#38bdf8;">Weekly Settlement Bill Preview</h3>
+        <button class="btn-cancel" onclick="closeBillModal()">Close</button>
+      </div>
+      <div id="billPrintableArea" class="bill-sheet"></div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-top:12px;">
+        <button class="btn btn-buy" id="billWaBtn" style="padding:9px; font-size:12px;">WhatsApp</button>
+        <button class="btn btn-primary" id="billPrintBtn" style="margin-top:0; padding:9px; font-size:12px;" onclick="window.print()">Print / PDF</button>
+        <button class="btn" id="billCsvBtn" style="background:#334155; color:#fff; padding:9px; font-size:12px;">CSV File</button>
       </div>
     </div>
   </div>
@@ -1478,6 +1514,11 @@
       }
     });
 
+    function shortDateOnly(ts) {
+      const m = String(ts || '').match(/^(\d{1,2}\/\d{1,2}\/\d{4})/);
+      return m ? m[1] : String(ts || '-').slice(0, 10);
+    }
+
     function computeClientFIFO(clientId) {
       const clientTrades = trades
         .filter(t => t.clientId === clientId && t.status !== 'CANCELLED')
@@ -1489,6 +1530,8 @@
       let unrealizedMtm = 0;
       let netOpenLong = 0;
       let netOpenShort = 0;
+      const matchedPairs = [];
+      const openPositions = [];
 
       clientTrades.forEach(t => {
         if (!contractQueues[t.contract]) contractQueues[t.contract] = [];
@@ -1505,8 +1548,27 @@
           const b = buys[bIdx];
           const s = sells[sIdx];
           const matchQty = Math.min(b.remainingQty, s.remainingQty);
+          const pairPnl = (s.netRate - b.netRate) * matchQty;
 
-          realizedPnL += (s.netRate - b.netRate) * matchQty;
+          realizedPnL += pairPnl;
+
+          const bDate = shortDateOnly(b.timestamp);
+          const sDate = shortDateOnly(s.timestamp);
+          const entryFirst = parseTradeDate(b) <= parseTradeDate(s);
+          const entryDate = entryFirst ? bDate : sDate;
+          const exitDate = entryFirst ? sDate : bDate;
+          const isIntraday = (entryDate !== '-' && entryDate === exitDate);
+
+          matchedPairs.push({
+            contract,
+            entryDate,
+            exitDate,
+            isIntraday,
+            qty: matchQty,
+            buyRate: Number(b.netRate),
+            sellRate: Number(s.netRate),
+            pnl: pairPnl
+          });
 
           b.remainingQty -= matchQty;
           s.remainingQty -= matchQty;
@@ -1518,12 +1580,32 @@
         buys.slice(bIdx).forEach(b => {
           netOpenLong += b.remainingQty;
           const cmp = getCmpForContract(contract, b.netRate);
-          unrealizedMtm += (cmp - b.netRate) * b.remainingQty;
+          const mtm = (cmp - b.netRate) * b.remainingQty;
+          unrealizedMtm += mtm;
+          openPositions.push({
+            contract,
+            entryDate: shortDateOnly(b.timestamp),
+            side: 'BUY',
+            qty: b.remainingQty,
+            openRate: Number(b.netRate),
+            cmp,
+            mtm
+          });
         });
         sells.slice(sIdx).forEach(s => {
           netOpenShort += s.remainingQty;
           const cmp = getCmpForContract(contract, s.netRate);
-          unrealizedMtm += (s.netRate - cmp) * s.remainingQty;
+          const mtm = (s.netRate - cmp) * s.remainingQty;
+          unrealizedMtm += mtm;
+          openPositions.push({
+            contract,
+            entryDate: shortDateOnly(s.timestamp),
+            side: 'SELL',
+            qty: s.remainingQty,
+            openRate: Number(s.netRate),
+            cmp,
+            mtm
+          });
         });
       }
 
@@ -1542,7 +1624,7 @@
       const cashAdjustment = cashReceivedFromClient - cashPaidToClient;
       const netBalance = realizedPnL + cashAdjustment;
 
-      return { realizedPnL, unrealizedMtm, cashPaidToClient, cashReceivedFromClient, cashAdjustment, netBalance, netOpenLong, netOpenShort, openLots: netOpenLong + netOpenShort };
+      return { realizedPnL, unrealizedMtm, cashPaidToClient, cashReceivedFromClient, cashAdjustment, netBalance, netOpenLong, netOpenShort, openLots: netOpenLong + netOpenShort, matchedPairs, openPositions };
     }
 
     function renderAll() {
@@ -2025,7 +2107,7 @@
           <td class="${netClass}"><b>${netDisplay}</b></td>
           <td>${openNotice}</td>
           <td>
-            <button class="btn-share" onclick="shareClientFile('${escapeHtml(c.id)}')">Bill</button>
+            <button class="btn-share" onclick="openBillModal('${escapeHtml(c.id)}')">Bill</button>
             <button class="btn-wa" onclick="sendWhatsAppSummary('${escapeHtml(c.id)}')">WA</button>
           </td>
         </tr>`;
@@ -2055,13 +2137,141 @@
       `).join('');
     }
 
+    function buildContractGroups(fifo) {
+      const groups = {};
+      fifo.matchedPairs.forEach(p => {
+        if (!groups[p.contract]) groups[p.contract] = { closed: [], open: [], realized: 0, mtm: 0 };
+        groups[p.contract].closed.push(p);
+        groups[p.contract].realized += p.pnl;
+      });
+      fifo.openPositions.forEach(o => {
+        if (!groups[o.contract]) groups[o.contract] = { closed: [], open: [], realized: 0, mtm: 0 };
+        groups[o.contract].open.push(o);
+        groups[o.contract].mtm += o.mtm;
+      });
+      return groups;
+    }
+
+    function openBillModal(clientId) {
+      const client = clients.find(c => c.id === clientId);
+      if (!client) return;
+      const fifo = computeClientFIFO(clientId);
+      const area = document.getElementById('billPrintableArea');
+      const groups = buildContractGroups(fifo);
+      const contractNames = Object.keys(groups);
+
+      const groupHtml = contractNames.length
+        ? contractNames.map(contract => {
+            const g = groups[contract];
+            const subTotal = g.realized + g.mtm;
+            const rows = [];
+
+            g.closed.forEach(p => {
+              rows.push(`
+                <tr>
+                  <td>${p.isIntraday ? '<span class="tag-intra">INTRA</span>' : '<span class="tag-pos">POS</span>'}</td>
+                  <td>${escapeHtml(p.entryDate)}</td>
+                  <td>${escapeHtml(p.exitDate)}</td>
+                  <td>${p.qty}</td>
+                  <td>₹${p.buyRate.toFixed(2)}</td>
+                  <td>₹${p.sellRate.toFixed(2)}</td>
+                  <td style="font-weight:700; color:${p.pnl >= 0 ? '#059669' : '#dc2626'};">${p.pnl >= 0 ? '+' : '-'}₹${Math.abs(p.pnl).toFixed(2)}</td>
+                </tr>`);
+            });
+
+            g.open.forEach(o => {
+              rows.push(`
+                <tr style="background:#fffbeb;">
+                  <td><span class="tag-pos">CARRY-FWD</span></td>
+                  <td>${escapeHtml(o.entryDate)}</td>
+                  <td>OPEN (${o.side})</td>
+                  <td>${o.qty}</td>
+                  <td>${o.side === 'BUY' ? '₹' + o.openRate.toFixed(2) : 'CMP ₹' + o.cmp.toFixed(2)}</td>
+                  <td>${o.side === 'SELL' ? '₹' + o.openRate.toFixed(2) : 'CMP ₹' + o.cmp.toFixed(2)}</td>
+                  <td style="font-weight:700; color:${o.mtm >= 0 ? '#059669' : '#dc2626'};">${o.mtm >= 0 ? '+' : '-'}₹${Math.abs(o.mtm).toFixed(2)}</td>
+                </tr>`);
+            });
+
+            return `
+              <div style="border:1px solid #cbd5e1; border-radius:6px; margin-bottom:10px; overflow:hidden;">
+                <div style="background:#e2e8f0; padding:6px 10px; display:flex; justify-content:space-between; font-weight:700; font-size:12px;">
+                  <span>${escapeHtml(contract)}</span>
+                  <span style="color:${subTotal >= 0 ? '#059669' : '#dc2626'};">Group Net: ${subTotal >= 0 ? '+' : '-'}₹${Math.abs(subTotal).toFixed(2)}</span>
+                </div>
+                <div class="table-wrap">
+                  <table style="margin-top:0;">
+                    <thead>
+                      <tr><th>Type</th><th>Entry Date</th><th>Exit / Status</th><th>Qty</th><th>Buy / Open</th><th>Sell / CMP</th><th>P&L / MTM</th></tr>
+                    </thead>
+                    <tbody>${rows.join('')}</tbody>
+                  </table>
+                </div>
+              </div>`;
+          }).join('')
+        : `<div style="text-align:center; color:#64748b; padding:16px;">No trades found for this client.</div>`;
+
+      const netWithMtm = fifo.netBalance + fifo.unrealizedMtm;
+      area.innerHTML = `
+        <div style="display:flex; justify-content:space-between; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:12px;">
+          <div>
+            <div style="font-size:15px; font-weight:800;">NSE F&O — WEEKLY SETTLEMENT BILL</div>
+            <div style="font-size:11px; color:#475569;">Period: ${escapeHtml(currentWeek.label)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-weight:700;">${escapeHtml(client.id)} - ${escapeHtml(client.name)}</div>
+            <div style="font-size:11px; color:#475569;">Branch: ${escapeHtml(normalizeBranch(client.branch).toUpperCase())}</div>
+          </div>
+        </div>
+
+        ${groupHtml}
+
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px; margin-top:8px; line-height:1.8;">
+          <div><b>Realized P&L (Closed):</b> ${fifo.realizedPnL >= 0 ? '+' : '-'}₹${Math.abs(fifo.realizedPnL).toFixed(2)}</div>
+          <div><b>Open Carry-Fwd MTM:</b> ${fifo.unrealizedMtm >= 0 ? '+' : '-'}₹${Math.abs(fifo.unrealizedMtm).toFixed(2)}</div>
+          <div><b>Cash Paid / Received:</b> Paid ₹${fifo.cashPaidToClient.toFixed(2)} | Rcvd ₹${fifo.cashReceivedFromClient.toFixed(2)}</div>
+          <div style="font-size:13px; border-top:1px solid #cbd5e1; margin-top:4px; padding-top:4px;">
+            <b>Net Settled Balance (Excl. Open MTM):</b>
+            <span style="color:${fifo.netBalance >= 0 ? '#059669' : '#dc2626'}; font-weight:800;">
+              ${fifo.netBalance >= 0 ? '+' : '-'}₹${Math.abs(fifo.netBalance).toFixed(2)} (${fifo.netBalance >= 0 ? 'લેવાના / Credit' : 'આપવાના / Debit'})
+            </span>
+          </div>
+          <div style="font-size:12px; color:#334155;">
+            <b>Net Incl. Live MTM:</b> ${netWithMtm >= 0 ? '+' : '-'}₹${Math.abs(netWithMtm).toFixed(2)}
+          </div>
+        </div>
+      `;
+
+      document.getElementById('billWaBtn').onclick = () => sendWhatsAppSummary(clientId);
+      document.getElementById('billCsvBtn').onclick = () => shareClientFile(clientId);
+      document.getElementById('billPreviewModal').style.display = 'flex';
+    }
+
+    function closeBillModal() {
+      document.getElementById('billPreviewModal').style.display = 'none';
+    }
+
     function sendWhatsAppSummary(clientId) {
       const client = clients.find(c => c.id === clientId);
       if (!client || !client.mobile) return showToast("Mobile number missing!");
       const fifo = computeClientFIFO(clientId);
+      const groups = buildContractGroups(fifo);
+      const contractNames = Object.keys(groups);
 
-      const openText = `Long: ${fifo.netOpenLong}, Short: ${fifo.netOpenShort}`;
-      const msg = `*NSE F&O Statement: ${client.name} (${client.id})*\nCycle: ${currentWeek.label}\n\n*Trading P&L:* ₹${fifo.realizedPnL.toFixed(2)}\n*Cash Paid:* ₹${fifo.cashPaidToClient.toFixed(2)} | *Rcvd:* ₹${fifo.cashReceivedFromClient.toFixed(2)}\n*Net Balance:* ₹${fifo.netBalance.toFixed(2)}\n*Open Carry-Fwd:* ${openText}\nStatus: ${fifo.netBalance >= 0 ? 'Net Receivable (Credit)' : 'Net Payable (Debit)'}`;
+      let groupText = contractNames.map(contract => {
+        const g = groups[contract];
+        const lines = [];
+        g.closed.forEach(p => {
+          lines.push(`  • [${p.isIntraday ? 'INTRA' : 'POS'}] ${p.entryDate}→${p.exitDate} | Qty:${p.qty} | ${p.pnl >= 0 ? '+' : '-'}₹${Math.abs(p.pnl).toFixed(0)}`);
+        });
+        g.open.forEach(o => {
+          lines.push(`  • [CARRY-FWD ${o.side}] ${o.entryDate} | Qty:${o.qty} @ ₹${o.openRate.toFixed(2)} (CMP ₹${o.cmp.toFixed(2)}) | MTM: ${o.mtm >= 0 ? '+' : '-'}₹${Math.abs(o.mtm).toFixed(0)}`);
+        });
+        const sub = g.realized + g.mtm;
+        return `*${contract}* (Net: ${sub >= 0 ? '+' : '-'}₹${Math.abs(sub).toFixed(0)})\n${lines.join('\n')}`;
+      }).join('\n\n');
+      if (!groupText) groupText = "• No trades";
+
+      const msg = `*NSE F&O WEEKLY BILL*\n*${client.name} (${client.id})*\nPeriod: ${currentWeek.label}\n\n${groupText}\n\n*Summary:*\nRealized P&L: ₹${fifo.realizedPnL.toFixed(2)}\nOpen MTM: ₹${fifo.unrealizedMtm.toFixed(2)}\nCash Paid: ₹${fifo.cashPaidToClient.toFixed(2)} | Rcvd: ₹${fifo.cashReceivedFromClient.toFixed(2)}\n*Net Balance:* ₹${fifo.netBalance.toFixed(2)} (${fifo.netBalance >= 0 ? 'Credit / લેવાના' : 'Debit / આપવાના'})`;
       const url = `https://wa.me/91${client.mobile}?text=${encodeURIComponent(msg)}`;
       window.open(url, '_blank');
     }
