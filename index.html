@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NSE F&O Enterprise Terminal</title>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <style>
     :root {
       --bg: #070b14;
@@ -205,9 +207,9 @@
       </div>
       <div id="billPrintableArea" class="bill-sheet"></div>
       <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-top:12px;">
-        <button class="btn btn-buy" id="billWaBtn" style="padding:9px; font-size:12px;">WhatsApp</button>
-        <button class="btn btn-primary" id="billPrintBtn" style="margin-top:0; padding:9px; font-size:12px;" onclick="window.print()">Print / PDF</button>
-        <button class="btn" id="billCsvBtn" style="background:#334155; color:#fff; padding:9px; font-size:12px;">CSV File</button>
+        <button class="btn btn-primary" id="billPdfBtn" style="margin-top:0; padding:10px; font-size:12px;">Share / Save PDF</button>
+        <button class="btn btn-buy" id="billWaBtn" style="padding:10px; font-size:12px;">WA Text</button>
+        <button class="btn" id="billCsvBtn" style="background:#334155; color:#fff; padding:10px; font-size:12px;">CSV File</button>
       </div>
     </div>
   </div>
@@ -2123,6 +2125,7 @@
           <td>${openNotice}</td>
           <td>
             <button class="btn-share" onclick="openBillModal('${escapeHtml(c.id)}')">Bill</button>
+            <button class="btn-edit" style="margin-left:4px;" onclick="generatePdfBill('${escapeHtml(c.id)}')">PDF</button>
             <button class="btn-wa" onclick="sendWhatsAppSummary('${escapeHtml(c.id)}')">WA</button>
           </td>
         </tr>`;
@@ -2256,9 +2259,173 @@
         </div>
       `;
 
+      document.getElementById('billPdfBtn').onclick = () => generatePdfBill(clientId);
       document.getElementById('billWaBtn').onclick = () => sendWhatsAppSummary(clientId);
       document.getElementById('billCsvBtn').onclick = () => shareClientFile(clientId);
       document.getElementById('billPreviewModal').style.display = 'flex';
+    }
+
+
+    async function generatePdfBill(clientId) {
+      const client = clients.find(c => c.id === clientId);
+      if (!client) return;
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        showToast("PDF library loading... please try again.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const fifo = computeClientFIFO(clientId);
+      const groups = buildContractGroups(fifo);
+      const contractNames = Object.keys(groups);
+      const fmtRs = (v) => (v < 0 ? '-Rs. ' : v > 0 ? '+Rs. ' : 'Rs. ') + Math.abs(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmtPlain = (v) => 'Rs. ' + Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      // Header Banner
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, 210, 32, 'F');
+      doc.setTextColor(56, 189, 248);
+      doc.setFontSize(15);
+      doc.setFont(undefined, 'bold');
+      doc.text('NSE F&O - WEEKLY SETTLEMENT BILL', 14, 13);
+
+      doc.setTextColor(226, 232, 240);
+      doc.setFontSize(9.5);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Settlement Period: ${currentWeek.label}`, 14, 21);
+      doc.text(`Branch: ${normalizeBranch(client.branch).toUpperCase()}`, 14, 27);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(11);
+      doc.text(`Client: ${client.id} - ${client.name}`, 196, 15, { align: 'right' });
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Mobile: ${client.mobile || '-'} | Brok: ${parseRate(client.rate)}%`, 196, 22, { align: 'right' });
+
+      let yPos = 40;
+
+      if (contractNames.length === 0) {
+        doc.setTextColor(100, 116, 139);
+        doc.setFontSize(11);
+        doc.text('No trades recorded for this client.', 14, yPos);
+        yPos += 12;
+      } else {
+        contractNames.forEach(contract => {
+          const g = groups[contract];
+          const subTotal = g.realized + g.mtm;
+
+          if (yPos > 250) { doc.addPage(); yPos = 18; }
+
+          doc.setFillColor(226, 232, 240);
+          doc.rect(14, yPos, 182, 7.5, 'F');
+          doc.setTextColor(15, 23, 42);
+          doc.setFontSize(10);
+          doc.setFont(undefined, 'bold');
+          doc.text(contract, 17, yPos + 5.2);
+          doc.setTextColor(subTotal >= 0 ? 5 : 220, subTotal >= 0 ? 150 : 38, subTotal >= 0 ? 105 : 38);
+          doc.text(`Group Net: ${fmtRs(subTotal)}`, 193, yPos + 5.2, { align: 'right' });
+          yPos += 8;
+
+          const bodyRows = [];
+          g.closed.forEach(p => {
+            bodyRows.push([
+              p.isIntraday ? 'INTRA' : 'POS',
+              p.entryDate,
+              p.exitDate,
+              String(p.qty),
+              fmtPlain(p.buyRate),
+              fmtPlain(p.sellRate),
+              fmtRs(p.pnl)
+            ]);
+          });
+          g.open.forEach(o => {
+            bodyRows.push([
+              `CARRY-FWD (${o.side})`,
+              o.entryDate,
+              'OPEN',
+              String(o.qty),
+              o.side === 'BUY' ? fmtPlain(o.openRate) : 'CMP ' + fmtPlain(o.cmp),
+              o.side === 'SELL' ? fmtPlain(o.openRate) : 'CMP ' + fmtPlain(o.cmp),
+              fmtRs(o.mtm)
+            ]);
+          });
+
+          doc.autoTable({
+            startY: yPos,
+            margin: { left: 14, right: 14 },
+            head: [['Type', 'Entry Date', 'Exit / Status', 'Qty', 'Buy / Open', 'Sell / CMP', 'Net P&L / MTM']],
+            body: bodyRows,
+            theme: 'grid',
+            styles: { fontSize: 8.5, cellPadding: 2.2, textColor: [15, 23, 42] },
+            headStyles: { fillColor: [241, 245, 249], textColor: [51, 65, 85], fontStyle: 'bold' },
+            columnStyles: {
+              3: { halign: 'right' },
+              4: { halign: 'right' },
+              5: { halign: 'right' },
+              6: { halign: 'right', fontStyle: 'bold' }
+            },
+            didParseCell: function(data) {
+              if (data.section === 'body' && data.column.index === 6) {
+                const txt = String(data.cell.raw || '');
+                if (txt.startsWith('+')) data.cell.styles.textColor = [5, 150, 105];
+                else if (txt.startsWith('-')) data.cell.styles.textColor = [220, 38, 38];
+              }
+            }
+          });
+          yPos = doc.lastAutoTable.finalY + 6;
+        });
+      }
+
+      if (yPos > 235) { doc.addPage(); yPos = 18; }
+      const netWithMtm = fifo.netBalance + fifo.unrealizedMtm;
+
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(14, yPos, 182, 40, 2, 2, 'FD');
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(10.5);
+      doc.setFont(undefined, 'bold');
+      doc.text('ACCOUNT SETTLEMENT SUMMARY', 18, yPos + 7);
+
+      doc.setFontSize(9.5);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Realized P&L (Closed Trades): ${fmtRs(fifo.realizedPnL)}`, 18, yPos + 14);
+      doc.text(`Open Carry-Forward MTM: ${fmtRs(fifo.unrealizedMtm)}`, 18, yPos + 20);
+      doc.text(`Cash Paid: ${fmtPlain(fifo.cashPaidToClient)}   |   Cash Received: ${fmtPlain(fifo.cashReceivedFromClient)}`, 18, yPos + 26);
+
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(fifo.netBalance >= 0 ? 5 : 220, fifo.netBalance >= 0 ? 150 : 38, fifo.netBalance >= 0 ? 105 : 38);
+      doc.text(`Net Settled Balance (Excl. Open MTM): ${fmtRs(fifo.netBalance)} (${fifo.netBalance >= 0 ? 'Credit / Receivable' : 'Debit / Payable'})`, 18, yPos + 33);
+
+      doc.setFontSize(9.5);
+      doc.setTextColor(51, 65, 85);
+      doc.text(`Net Valuation Incl. Open MTM: ${fmtRs(netWithMtm)}`, 18, yPos + 38.5);
+
+      const safeClientName = String(client.name || 'Client').replace(/[^A-Za-z0-9_-]+/g, '_');
+      const filename = `Bill_${client.id}_${safeClientName}.pdf`;
+      const pdfBlob = doc.output('blob');
+      const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        try {
+          await navigator.share({
+            files: [pdfFile],
+            title: `Weekly Bill - ${client.name} (${client.id})`,
+            text: `NSE F&O Weekly Settlement Bill (${currentWeek.label})`
+          });
+          showToast("PDF shared successfully!");
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+      }
+
+      doc.save(filename);
+      showToast(`PDF downloaded: ${filename}`);
     }
 
     function closeBillModal() {
