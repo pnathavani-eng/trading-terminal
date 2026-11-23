@@ -601,14 +601,12 @@
     <div class="card">
       <div class="card-title">Existing Clients Directory</div>
       <div class="table-wrap">
-        <table>
+        <table style="min-width:100%;">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Branch</th>
+              <th>Client</th>
               <th>Rate</th>
-              <th>Action</th>
+              <th style="text-align:right;">Edit / Delete</th>
             </tr>
           </thead>
           <tbody id="clientsListBody"></tbody>
@@ -2266,19 +2264,17 @@
       const visibleClients = getVisibleClients();
 
       if (visibleClients.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--muted); padding:14px;">No active clients.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--muted); padding:14px;">No active clients.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = visibleClients.map(c => `
         <tr>
-          <td><b>${escapeHtml(c.id)}</b></td>
-          <td>${escapeHtml(c.name)}</td>
-          <td>${escapeHtml(normalizeBranch(c.branch).toUpperCase())}</td>
-          <td>${parseRate(c.rate)}%</td>
-          <td>
+          <td style="white-space:normal;"><b>${escapeHtml(c.id)}</b> - ${escapeHtml(c.name)}<span class="timestamp-text">${escapeHtml(normalizeBranch(c.branch).toUpperCase())} | ${escapeHtml(c.mobile || '-')}</span></td>
+          <td><b>${parseRate(c.rate)}%</b></td>
+          <td style="text-align:right;">
             <button class="btn-edit" onclick="startEditClient('${escapeHtml(c.id)}')">Edit</button>
-            <button class="btn-cancel" onclick="openRemoveClientModal('${escapeHtml(c.id)}')">Exit</button>
+            <button class="btn-cancel" onclick="openRemoveClientModal('${escapeHtml(c.id)}')">Delete</button>
           </td>
         </tr>
       `).join('');
@@ -3116,6 +3112,7 @@
       document.getElementById('saveClientBtn').innerText = "Update Client";
       document.getElementById('cancelEditBtn').style.display = "inline-block";
       switchTab('manageTab');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function cancelEdit() {
