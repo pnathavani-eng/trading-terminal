@@ -806,7 +806,21 @@
   </div>
 
   <script>
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwlBVirHkMzPuzd1xOOak6tTPv8-moSehHCig3RFJEFr-gO2ut_Y9xwtQiQBWOhOpjkoA/exec";
+    const SUPABASE_URL = "https://qdgjpjswbgnzmmnqihgc.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_e0LyXT-WwZ3ddUJgifcbZA_JCwyoU-F";
+    const API_URL = `${SUPABASE_URL}/functions/v1/api`;
+    const PRICES_URL = `${SUPABASE_URL}/functions/v1/prices`;
+    const GOOGLE_SCRIPT_URL = API_URL;
+
+    function edgeHeaders(withJson = true) {
+      const h = { "apikey": SUPABASE_ANON_KEY };
+      if (SUPABASE_ANON_KEY.startsWith("eyJ")) {
+        h["Authorization"] = `Bearer ${SUPABASE_ANON_KEY}`;
+      }
+      if (sessionToken) h["x-session-token"] = sessionToken;
+      if (withJson) h["Content-Type"] = "application/json";
+      return h;
+    }
     let sessionToken = safeGetLS("app_session_token_v1", "");
 
     function safeGetLS(key, fallback = null) {
@@ -841,6 +855,8 @@
     let lockTickId = null;
     let isSyncing = false;
     let lastSyncDigest = '';
+    let lastSyncRev = Number(safeGetLS('app_sync_rev_v1', '0')) || 0;
+    let lastPruneEpoch = Number(safeGetLS('app_prune_epoch_v1', '1')) || 1;
     let outboxQueue = [];
     try { outboxQueue = JSON.parse(safeGetLS('app_outbox_v1', '[]')) || []; } catch { outboxQueue = []; }
 
@@ -965,10 +981,9 @@
       try {
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), 12000);
-        const resp = await fetch(GOOGLE_SCRIPT_URL, {
+        const resp = await fetch(API_URL, {
           method: "POST",
-          redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          headers: edgeHeaders(true),
           body: JSON.stringify({ action: "login", pin: pin }),
           signal: ctrl.signal
         });
@@ -1003,11 +1018,10 @@
 
     function logout() {
       const tok = sessionToken;
-      if (tok && GOOGLE_SCRIPT_URL) {
-        fetch(GOOGLE_SCRIPT_URL, {
+      if (tok && API_URL) {
+        fetch(API_URL, {
           method: "POST",
-          redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          headers: edgeHeaders(true),
           body: JSON.stringify({ action: "logout", token: tok })
         }).catch(() => {});
       }
@@ -1024,8 +1038,10 @@
       contractPriceMeta = {};
       outboxQueue = [];
       lastSyncDigest = '';
+      lastSyncRev = 0;
+      lastPruneEpoch = 1;
       try {
-        ['app_session_token_v1', 'app_clients_v5', 'app_trades_v5', 'app_ledger_v1', 'app_branches_v7', 'app_custom_scripts_v1', 'app_live_prices_v1', 'app_contract_prices_v1', 'app_contract_price_meta_v1', 'app_outbox_v1'].forEach(k => localStorage.removeItem(k));
+        ['app_session_token_v1', 'app_clients_v5', 'app_trades_v5', 'app_ledger_v1', 'app_branches_v7', 'app_custom_scripts_v1', 'app_live_prices_v1', 'app_contract_prices_v1', 'app_contract_price_meta_v1', 'app_outbox_v1', 'app_sync_rev_v1', 'app_prune_epoch_v1'].forEach(k => localStorage.removeItem(k));
       } catch {}
       ['orderModal','editTradeModal','deleteModal','reqCancelModal','removeClientModal','billPreviewModal','setCmpModal','pruneDataModal','appConfirmModal','editBranchModal'].forEach(mid => {
         const mel = document.getElementById(mid);
@@ -1125,10 +1141,9 @@
       try {
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), 25000);
-        const resp = await fetch(GOOGLE_SCRIPT_URL, {
+        const resp = await fetch(API_URL, {
           method: "POST",
-          redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          headers: edgeHeaders(true),
           body: JSON.stringify(bodyObj),
           signal: ctrl.signal
         });
@@ -1190,32 +1205,51 @@
 
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), 25000);
-        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(sessionToken)}`, { signal: ctrl.signal });
+        const reqRev = manual ? 0 : lastSyncRev;
+        const resp = await fetch(`${API_URL}?since=${encodeURIComponent(reqRev)}`, { headers: edgeHeaders(false), signal: ctrl.signal });
         clearTimeout(tid);
         if (!currentSession) return;
 
-        const data = await resp.json();
+        let data = await resp.json();
         if (!currentSession) return;
 
+        if (data.status === "success" && Number(data.prune_epoch || 1) !== lastPruneEpoch && reqRev > 0) {
+          lastSyncRev = 0;
+          const respFull = await fetch(`${API_URL}?since=0`, { headers: edgeHeaders(false) });
+          data = await respFull.json();
+          if (!currentSession) return;
+        }
+
         if (data.status === "success") {
-          if (Array.isArray(data.branches) && data.branches.length > 0) {
-            branches = data.branches.map(b => ({
+          const isInc = Boolean(data.incremental && reqRev > 0);
+          const mergeById = (existing, incoming, key = 'id') => {
+            if (!isInc) return incoming;
+            const map = new Map(existing.map(x => [x[key], x]));
+            incoming.forEach(x => map.set(x[key], x));
+            return Array.from(map.values());
+          };
+
+          if (Array.isArray(data.branches)) {
+            const incBranches = data.branches.map(b => ({
               ...b,
               id: normalizeBranch(b.id),
               prefix: String(b.prefix || 'B').toUpperCase()
             }));
+            if (isInc) branches = mergeById(branches, incBranches);
+            else if (incBranches.length > 0) branches = incBranches;
           }
 
-          let nextClients = Array.isArray(data.clients) ? data.clients.map(sc => ({
+          const mappedClients = Array.isArray(data.clients) ? data.clients.map(sc => ({
             id: String(sc.id || sc.client_id || '').trim(),
             name: String(sc.name || '').trim(),
             mobile: String(sc.mobile || sc.phone || '').trim(),
             rate: parseRate(sc.rate ?? sc.brokerage_rate),
             branch: normalizeBranch(sc.branch),
             active: sc.active !== false && String(sc.active).toUpperCase() !== 'FALSE'
-          })).filter(c => c.id) : clients;
+          })).filter(c => c.id) : [];
+          let nextClients = Array.isArray(data.clients) ? mergeById(clients, mappedClients) : clients;
 
-          let nextTrades = Array.isArray(data.trades) ? data.trades.map(st => {
+          const mappedTrades = Array.isArray(data.trades) ? data.trades.map(st => {
             const tid = String(st.id || st.trade_id || '').trim();
             const side = String(st.action || st.side || '').toUpperCase();
             const stStatus = String(st.status || 'OPEN').toUpperCase();
@@ -1242,9 +1276,10 @@
               brokerageRate: (st.brokerageRate !== undefined && st.brokerageRate !== '') ? Number(st.brokerageRate) : 0.01,
               brokerageAmt: (st.brokerageAmt !== undefined && st.brokerageAmt !== '') ? Number(st.brokerageAmt) : Number((Math.abs(netRate - basePrice) * (Number(st.qty) || 0)).toFixed(2))
             };
-          }).filter(t => t.id && (t.action === 'BUY' || t.action === 'SELL')) : trades;
+          }).filter(t => t.id && (t.action === 'BUY' || t.action === 'SELL')) : [];
+          let nextTrades = Array.isArray(data.trades) ? mergeById(trades, mappedTrades) : trades;
 
-          let nextLedger = Array.isArray(data.ledger) ? data.ledger.map(sl => ({
+          const mappedLedger = Array.isArray(data.ledger) ? data.ledger.map(sl => ({
             id: String(sl.id || sl.entry_id || '').trim(),
             date: String(sl.date || '').trim(),
             clientId: String(sl.clientId || sl.client_id || '').trim(),
@@ -1254,9 +1289,9 @@
             debit: Number(sl.debit) || 0,
             credit: Number(sl.credit) || 0,
             remarks: String(sl.remarks || '').trim()
-          })).filter(l => l.id) : ledger;
+          })).filter(l => l.id) : [];
+          let nextLedger = Array.isArray(data.ledger) ? mergeById(ledger, mappedLedger) : ledger;
 
-          // Merge any still-pending outbox items so unsynced local records are never lost
           outboxQueue.forEach(q => {
             if (q.localType === 'trade' && q.localRecord && !nextTrades.some(t => t.id === q.localRecord.id)) {
               nextTrades.push(q.localRecord);
@@ -1270,6 +1305,14 @@
           clients = nextClients;
           trades = nextTrades;
           ledger = nextLedger;
+          if (Number(data.max_rev) > 0) {
+            lastSyncRev = Number(data.max_rev);
+            safeSetLS('app_sync_rev_v1', String(lastSyncRev));
+          }
+          if (Number(data.prune_epoch) > 0) {
+            lastPruneEpoch = Number(data.prune_epoch);
+            safeSetLS('app_prune_epoch_v1', String(lastPruneEpoch));
+          }
 
           if (data.liveRates && typeof data.liveRates === 'object') {
             for (const cKey in data.liveRates) {
@@ -1288,7 +1331,13 @@
             safeSetLS('app_contract_price_meta_v1', JSON.stringify(contractPriceMeta));
           }
           if (Array.isArray(data.scripts)) {
-            customScripts = data.scripts;
+            if (isInc && data.scripts.length > 0) {
+              const sMap = new Map(customScripts.map(s => [s.name, s]));
+              data.scripts.forEach(s => sMap.set(s.name, s));
+              customScripts = Array.from(sMap.values());
+            } else if (!isInc) {
+              customScripts = data.scripts;
+            }
             safeSetLS('app_custom_scripts_v1', JSON.stringify(customScripts));
             rebuildStockCatalog();
           }
@@ -1607,7 +1656,7 @@
       try {
         const pCtrl = new AbortController();
         const pTid = setTimeout(() => pCtrl.abort(), 15000);
-        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(sessionToken)}&mode=live_price&symbol=${encodeURIComponent(sym)}&monthCode=${encodeURIComponent(mCode)}&contract=${encodeURIComponent(contract)}`, { signal: pCtrl.signal });
+        const resp = await fetch(`${PRICES_URL}?mode=live_price&symbol=${encodeURIComponent(sym)}&monthCode=${encodeURIComponent(mCode)}&contract=${encodeURIComponent(contract)}`, { headers: edgeHeaders(false), signal: pCtrl.signal });
         clearTimeout(pTid);
         const data = await resp.json();
         if (data.status === "success" && data.price > 0) {
@@ -1653,7 +1702,7 @@
       try {
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), 25000);
-        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(sessionToken)}&mode=batch_prices&contracts=${encodeURIComponent(contractsArr.join(','))}`, { signal: ctrl.signal });
+        const resp = await fetch(`${PRICES_URL}?mode=batch_prices&contracts=${encodeURIComponent(contractsArr.join(','))}`, { headers: edgeHeaders(false), signal: ctrl.signal });
         clearTimeout(tid);
         const data = await resp.json();
         if (data.status === "success" && data.prices) {
@@ -1776,7 +1825,13 @@
       renderAll();
 
       clearInterval(syncIntervalId);
-      syncIntervalId = setInterval(syncFromGoogleSheet, 60000);
+      syncIntervalId = setInterval(() => { if (currentSession && !document.hidden) syncFromGoogleSheet(false); }, 20000);
+      if (!window._visSyncBound) {
+        window._visSyncBound = true;
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden && currentSession) syncFromGoogleSheet(false);
+        });
+      }
     }
 
     function forceSwitchToDefaultTab() {
