@@ -172,6 +172,54 @@
     </div>
   </div>
 
+
+  <!-- Edit Trade Modal (Admin Only) -->
+  <div id="editTradeModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-box" style="text-align:left;">
+      <h3 style="margin-bottom:6px; font-size:16px; color:#38bdf8; text-align:center;">Edit Trade (Rajkot HQ Only)</h3>
+      <p id="editTradeInfo" style="font-size:11px; color:var(--muted); margin-bottom:10px; text-align:center;"></p>
+      <div class="form-grid" style="margin-bottom:12px;">
+        <div>
+          <label>Side</label>
+          <select id="editTradeSide">
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+          </select>
+        </div>
+        <div>
+          <label>Quantity (Shares)</label>
+          <input type="number" id="editTradeQty" min="1" step="1">
+        </div>
+        <div class="full-width">
+          <label>Execution Price (Base Rate ₹)</label>
+          <input type="number" id="editTradePrice" step="0.05" min="0.05">
+        </div>
+        <div class="full-width">
+          <label>Admin Password / PIN</label>
+          <input type="password" id="editTradePin" placeholder="Enter Admin Password" style="text-align:center;">
+        </div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary" style="margin-top:0;" onclick="confirmEditTrade()">Save Changes</button>
+        <button class="btn" style="background:#475569; color:#fff;" onclick="closeEditTradeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Prune Old Data Modal -->
+  <div id="pruneDataModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-box">
+      <h3 style="margin-bottom:8px; font-size:16px; color:#f59e0b;">Confirm 6-Month Data Cleanup</h3>
+      <p id="pruneModalInfo" style="font-size:11px; color:var(--muted); margin-bottom:12px;"></p>
+      <input type="password" id="pruneAdminPin" placeholder="Enter Admin Password / PIN" style="text-align:center; font-size:16px; margin-bottom:12px;">
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-cancel" style="padding:11px; font-size:13px;" onclick="confirmPruneOldData()">Download Backup &amp; Delete</button>
+        <button class="btn" style="background:#475569; color:#fff;" onclick="closePruneModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Delete Trade Modal -->
   <div id="deleteModal" class="modal-backdrop" style="display:none;">
     <div class="modal-box">
@@ -248,6 +296,15 @@
     <button class="tab-btn" id="tabBtnLedger" data-tab="ledgerTab" onclick="switchTab('ledgerTab')">Cash Ledger</button>
     <button class="tab-btn" id="btnManage" data-tab="manageTab" onclick="switchTab('manageTab')">Clients Manager</button>
     <button class="tab-btn" id="btnSettings" data-tab="settingsTab" onclick="switchTab('settingsTab')">Branches & Scripts</button>
+  </div>
+
+
+  <div id="retentionAlertBanner" style="display:none; background:#451a03; border:1px solid #f59e0b; color:#fde68a; padding:10px 12px; border-radius:8px; margin-bottom:12px; font-size:12px;">
+    <div style="font-weight:700; margin-bottom:6px;" id="retentionAlertText"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn-share" onclick="downloadOldDataBackup()">1. Download Local Backup</button>
+      <button class="btn-cancel" onclick="openPruneModal()">2. Clear &gt;6 Month Data</button>
+    </div>
   </div>
 
   <!-- TAB 1: Terminal -->
@@ -614,6 +671,19 @@
         </div>
       </div>
       <button class="btn btn-primary" onclick="saveUpdatedPin()">Update Password & Sync</button>
+    </div>
+
+    
+    <div class="card" id="dataRetentionCard">
+      <div class="card-title">6-Month Auto-Cleanup &amp; Local Backup</div>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">
+        Rolling 6-Month Window: Always keeps the latest 6 months active. Only data older than 6 months (7th month+) is backed up locally and cleared from Phone &amp; Google Sheet.
+      </p>
+      <div id="retentionStatusBox" style="font-size:12px; margin-bottom:10px; padding:8px; background:#070b14; border:1px solid var(--border); border-radius:6px;"></div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+        <button class="btn btn-primary" style="margin-top:0;" onclick="downloadOldDataBackup(true)">Backup All / Old Data</button>
+        <button class="btn btn-cancel" style="padding:11px; font-size:13px;" onclick="openPruneModal()">Clear &gt;6 Month Data</button>
+      </div>
     </div>
 
     <div class="card" id="scriptManagerCard">
@@ -1343,6 +1413,8 @@
         document.getElementById('branchDirectoryCard').style.display = 'none';
         document.getElementById('pinTargetWrap').style.display = 'none';
         document.getElementById('scriptManagerCard').style.display = 'none';
+        document.getElementById('dataRetentionCard').style.display = 'none';
+        document.getElementById('retentionAlertBanner').style.display = 'none';
         document.getElementById('mtmCard').style.display = 'none';
         document.getElementById('subBrokerSummaryCard').style.display = 'none';
         document.getElementById('manageTitle').innerText = `Add / Edit Client (${currentSession.branchName})`;
@@ -1356,6 +1428,7 @@
         document.getElementById('branchDirectoryCard').style.display = 'block';
         document.getElementById('pinTargetWrap').style.display = 'block';
         document.getElementById('scriptManagerCard').style.display = 'block';
+        document.getElementById('dataRetentionCard').style.display = 'block';
         document.getElementById('mtmCard').style.display = 'block';
         document.getElementById('subBrokerSummaryCard').style.display = 'block';
         document.getElementById('manageTitle').innerText = "Add / Edit Client";
@@ -1653,6 +1726,7 @@
         renderMtmContractOptions();
         renderScriptsManager();
         renderSubBrokerSummary();
+        checkSixMonthRetention();
       }
       renderBills();
       renderLedgerDropdown();
@@ -1924,8 +1998,8 @@
         let actionBtn = '';
         if (isAdmin) {
           actionBtn = isPendingCancel
-            ? `<button class="btn-cancel" onclick="openDeleteModal('${escapeHtml(t.id)}')">Approve Del</button> <button class="btn-edit" onclick="rejectCancel('${escapeHtml(t.id)}')">Keep</button>`
-            : `<button class="btn-cancel" onclick="openDeleteModal('${escapeHtml(t.id)}')">Delete</button>`;
+            ? `<button class="btn-edit" onclick="openEditTradeModal('${escapeHtml(t.id)}')">Edit</button><button class="btn-cancel" onclick="openDeleteModal('${escapeHtml(t.id)}')">Approve Del</button> <button class="btn-edit" onclick="rejectCancel('${escapeHtml(t.id)}')">Keep</button>`
+            : `<button class="btn-edit" onclick="openEditTradeModal('${escapeHtml(t.id)}')">Edit</button><button class="btn-cancel" onclick="openDeleteModal('${escapeHtml(t.id)}')">Delete</button>`;
         } else {
           actionBtn = isPendingCancel
             ? `<span class="amber" style="font-size:11px;">Delete Pending</span>`
@@ -2124,7 +2198,8 @@
           <td class="${netClass}"><b>${netDisplay}</b></td>
           <td>${openNotice}</td>
           <td>
-            <button class="btn-share" onclick="openBillModal('${escapeHtml(c.id)}')">Bill</button>
+            <button class="btn-req" onclick="generateDailyPdf('${escapeHtml(c.id)}')">Daily</button>
+            <button class="btn-share" style="margin-left:4px;" onclick="openBillModal('${escapeHtml(c.id)}')">Bill</button>
             <button class="btn-edit" style="margin-left:4px;" onclick="generatePdfBill('${escapeHtml(c.id)}')">PDF</button>
             <button class="btn-wa" onclick="sendWhatsAppSummary('${escapeHtml(c.id)}')">WA</button>
           </td>
@@ -2265,6 +2340,174 @@
       document.getElementById('billPreviewModal').style.display = 'flex';
     }
 
+
+
+    async function generateDailyPdf(clientId) {
+      const client = clients.find(c => c.id === clientId);
+      if (!client) return;
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        showToast("PDF library loading... please try again.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      const now = new Date();
+      const todayStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+      const fmtRs = (v) => (v < 0 ? '-Rs. ' : v > 0 ? '+Rs. ' : 'Rs. ') + Math.abs(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmtPlain = (v) => 'Rs. ' + Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      // Header
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, 210, 30, 'F');
+      doc.setTextColor(56, 189, 248);
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('NSE F&O - DAILY TRADES & OPEN POSITION', 14, 13);
+
+      doc.setTextColor(226, 232, 240);
+      doc.setFontSize(9.5);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Report Date: ${todayStr}`, 14, 21);
+      doc.text(`Branch: ${normalizeBranch(client.branch).toUpperCase()}`, 14, 26.5);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(11);
+      doc.text(`Client: ${client.id} - ${client.name}`, 196, 15, { align: 'right' });
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.text(`(Position Statement Only - Non-Settlement)`, 196, 22, { align: 'right' });
+
+      let yPos = 38;
+
+      // Section 1: Today's Executed Trades
+      const todaysTrades = trades
+        .filter(t => t.clientId === clientId && t.status !== 'CANCELLED' && shortDateOnly(t.timestamp) === todayStr)
+        .slice()
+        .sort((a, b) => parseTradeDate(a) - parseTradeDate(b));
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'bold');
+      doc.text(`1. Today's Executed Trades (${todayStr})`, 14, yPos);
+      yPos += 3;
+
+      if (todaysTrades.length === 0) {
+        yPos += 5;
+        doc.setTextColor(100, 116, 139);
+        doc.setFontSize(9.5);
+        doc.setFont(undefined, 'normal');
+        doc.text('No new trades executed today.', 14, yPos);
+        yPos += 8;
+      } else {
+        const tRows = todaysTrades.map(t => {
+          const timePart = String(t.timestamp || '').split(' ')[1] || '-';
+          return [
+            timePart,
+            t.contract,
+            t.action,
+            String(t.qty),
+            fmtPlain(t.basePrice || t.netRate),
+            fmtPlain(t.netRate)
+          ];
+        });
+        doc.autoTable({
+          startY: yPos,
+          margin: { left: 14, right: 14 },
+          head: [['Time', 'Contract', 'Side', 'Qty', 'Base Rate', 'Net Rate']],
+          body: tRows,
+          theme: 'grid',
+          styles: { fontSize: 8.5, cellPadding: 2.2, textColor: [15, 23, 42] },
+          headStyles: { fillColor: [226, 232, 240], textColor: [15, 23, 42], fontStyle: 'bold' },
+          columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } },
+          didParseCell: function(data) {
+            if (data.section === 'body' && data.column.index === 2) {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.textColor = data.cell.raw === 'BUY' ? [5, 150, 105] : [220, 38, 38];
+            }
+          }
+        });
+        yPos = doc.lastAutoTable.finalY + 8;
+      }
+
+      // Section 2: Current Open Carry-Forward Positions
+      const fifo = computeClientFIFO(clientId);
+      if (yPos > 235) { doc.addPage(); yPos = 18; }
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'bold');
+      doc.text('2. Current Open Positions (Standing Carry-Forward)', 14, yPos);
+      yPos += 3;
+
+      if (fifo.openPositions.length === 0) {
+        yPos += 5;
+        doc.setTextColor(100, 116, 139);
+        doc.setFontSize(9.5);
+        doc.setFont(undefined, 'normal');
+        doc.text('No open positions standing.', 14, yPos);
+      } else {
+        const oRows = fifo.openPositions.map(o => [
+          o.contract,
+          o.entryDate,
+          o.side,
+          String(o.qty),
+          fmtPlain(o.openRate),
+          fmtPlain(o.cmp),
+          fmtRs(o.mtm)
+        ]);
+        doc.autoTable({
+          startY: yPos,
+          margin: { left: 14, right: 14 },
+          head: [['Contract', 'Entry Date', 'Side', 'Qty', 'Open Rate', 'CMP', 'Live MTM']],
+          body: oRows,
+          theme: 'grid',
+          styles: { fontSize: 8.5, cellPadding: 2.2, textColor: [15, 23, 42] },
+          headStyles: { fillColor: [226, 232, 240], textColor: [15, 23, 42], fontStyle: 'bold' },
+          columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } },
+          didParseCell: function(data) {
+            if (data.section === 'body' && data.column.index === 2) {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.textColor = data.cell.raw === 'BUY' ? [5, 150, 105] : [220, 38, 38];
+            }
+            if (data.section === 'body' && data.column.index === 6) {
+              const txt = String(data.cell.raw || '');
+              if (txt.startsWith('+')) data.cell.styles.textColor = [5, 150, 105];
+              else if (txt.startsWith('-')) data.cell.styles.textColor = [220, 38, 38];
+            }
+          }
+        });
+        yPos = doc.lastAutoTable.finalY + 6;
+        doc.setFontSize(10.5);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(fifo.unrealizedMtm >= 0 ? 5 : 220, fifo.unrealizedMtm >= 0 ? 150 : 38, fifo.unrealizedMtm >= 0 ? 105 : 38);
+        doc.text(`Total Open MTM: ${fmtRs(fifo.unrealizedMtm)}`, 196, yPos, { align: 'right' });
+      }
+
+      const safeClientName = String(client.name || 'Client').replace(/[^A-Za-z0-9_-]+/g, '_');
+      const filename = `Daily_Pos_${client.id}_${safeClientName}.pdf`;
+      const pdfBlob = doc.output('blob');
+      const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        try {
+          await navigator.share({
+            files: [pdfFile],
+            title: `Daily Position - ${client.name} (${client.id})`,
+            text: `NSE F&O Daily Trades & Open Position (${todayStr})`
+          });
+          showToast("Daily PDF shared!");
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+      }
+
+      doc.save(filename);
+      showToast(`Daily PDF downloaded: ${filename}`);
+    }
 
     async function generatePdfBill(clientId) {
       const client = clients.find(c => c.id === clientId);
@@ -2589,6 +2832,67 @@
       renderAll();
     }
 
+
+    let pendingEditTradeId = null;
+
+    function openEditTradeModal(tradeId) {
+      if (!currentSession || currentSession.role !== 'admin') return;
+      const t = trades.find(x => x.id === tradeId);
+      if (!t) return;
+      pendingEditTradeId = tradeId;
+      document.getElementById('editTradeInfo').innerText = `${t.clientId} - ${t.clientName} | ${t.contract}`;
+      document.getElementById('editTradeSide').value = t.action;
+      document.getElementById('editTradeQty').value = t.qty;
+      document.getElementById('editTradePrice').value = Number(t.basePrice || t.netRate).toFixed(2);
+      document.getElementById('editTradePin').value = '';
+      document.getElementById('editTradeModal').style.display = 'flex';
+    }
+
+    function closeEditTradeModal() {
+      pendingEditTradeId = null;
+      document.getElementById('editTradeModal').style.display = 'none';
+    }
+
+    async function confirmEditTrade() {
+      if (!currentSession || currentSession.role !== 'admin' || !pendingEditTradeId) return;
+      const pin = document.getElementById('editTradePin').value.trim();
+      const pinHash = await sha256(pin);
+      const adminBranch = branches.find(b => b.role === 'admin' && b.pinHash === pinHash);
+      if (!adminBranch) return showToast("Incorrect Master Admin Password / PIN!");
+
+      const t = trades.find(x => x.id === pendingEditTradeId);
+      if (!t) return;
+
+      const side = document.getElementById('editTradeSide').value;
+      const qty = parseInt(document.getElementById('editTradeQty').value, 10) || 0;
+      const basePrice = parseFloat(document.getElementById('editTradePrice').value) || 0;
+      if (qty <= 0 || basePrice <= 0) return showToast("Enter valid Qty and Price!");
+
+      const c = clients.find(x => x.id === t.clientId);
+      const brokRate = c ? parseRate(c.rate) : 0.01;
+      const brokFactor = basePrice * (brokRate / 100);
+      const netRate = side === 'BUY' ? (basePrice + brokFactor) : (basePrice - brokFactor);
+
+      t.action = side;
+      t.qty = qty;
+      t.basePrice = basePrice;
+      t.netRate = netRate;
+      saveState();
+
+      syncToGoogleSheet({
+        action: "edit_trade",
+        id: t.id,
+        side: side,
+        qty: qty,
+        basePrice: basePrice,
+        netRate: Number(netRate).toFixed(2)
+      });
+
+      closeEditTradeModal();
+      renderAll();
+      showToast(`Trade updated: ${t.contract} (${side} ${qty}) @ ₹${netRate.toFixed(2)}`);
+    }
+
     function openDeleteModal(tradeId) {
       pendingDeleteTradeId = tradeId;
       document.getElementById('modalPinInput').value = '';
@@ -2818,6 +3122,122 @@
       showToast(`Branch ${name} (${prefix}) created & synced!`);
     }
 
+
+
+    function getSixMonthCutoffMs() {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 6);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }
+
+    function parseLedgerDateMs(l) {
+      const m = String(l.date || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (!m) return 0;
+      return new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10)).getTime();
+    }
+
+    function getOldRecords() {
+      const cutoff = getSixMonthCutoffMs();
+      const oldTrades = trades.filter(t => {
+        const ms = parseTradeDate(t);
+        return ms > 0 && ms < cutoff;
+      });
+      const oldLedger = ledger.filter(l => {
+        const ms = parseLedgerDateMs(l);
+        return ms > 0 && ms < cutoff;
+      });
+      return { cutoff, oldTrades, oldLedger };
+    }
+
+    function checkSixMonthRetention() {
+      if (!currentSession || currentSession.role !== 'admin') return;
+      const { cutoff, oldTrades, oldLedger } = getOldRecords();
+      const cutoffDateStr = new Date(cutoff).toLocaleDateString('en-IN');
+      const statusEl = document.getElementById('retentionStatusBox');
+      const bannerEl = document.getElementById('retentionAlertBanner');
+      const textEl = document.getElementById('retentionAlertText');
+
+      if (statusEl) {
+        statusEl.innerHTML = `Cutoff Date (6 Months Ago): <b>${cutoffDateStr}</b><br>Old Trades: <b>${oldTrades.length}</b> | Old Ledger Entries: <b>${oldLedger.length}</b>`;
+      }
+
+      if (oldTrades.length > 0 || oldLedger.length > 0) {
+        if (bannerEl && textEl) {
+          textEl.innerText = `Backup Alert: ${oldTrades.length} trade(s) & ${oldLedger.length} ledger entry(s) are older than 6 months (before ${cutoffDateStr}).`;
+          bannerEl.style.display = 'block';
+        }
+      } else if (bannerEl) {
+        bannerEl.style.display = 'none';
+      }
+    }
+
+    function downloadOldDataBackup(includeAllIfNoOld = false) {
+      const { cutoff, oldTrades, oldLedger } = getOldRecords();
+      const exportTrades = (oldTrades.length > 0 || !includeAllIfNoOld) ? oldTrades : trades;
+      const exportLedger = (oldLedger.length > 0 || !includeAllIfNoOld) ? oldLedger : ledger;
+
+      if (exportTrades.length === 0 && exportLedger.length === 0) {
+        return showToast("No records available to backup.");
+      }
+
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        cutoffDate: new Date(cutoff).toISOString(),
+        trades: exportTrades,
+        ledger: exportLedger
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const now = new Date();
+      const fname = `FNO_Backup_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}.json`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fname;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`Backup saved locally: ${fname}`);
+    }
+
+    function openPruneModal() {
+      const { cutoff, oldTrades, oldLedger } = getOldRecords();
+      if (oldTrades.length === 0 && oldLedger.length === 0) {
+        return showToast("No data older than 6 months to delete.");
+      }
+      document.getElementById('pruneModalInfo').innerText = `This will download a local JSON backup first, then permanently delete ${oldTrades.length} trade(s) and ${oldLedger.length} ledger entry(s) older than ${new Date(cutoff).toLocaleDateString('en-IN')} from Phone & Google Sheet.`;
+      document.getElementById('pruneAdminPin').value = '';
+      document.getElementById('pruneDataModal').style.display = 'flex';
+    }
+
+    function closePruneModal() {
+      document.getElementById('pruneDataModal').style.display = 'none';
+    }
+
+    async function confirmPruneOldData() {
+      const pin = document.getElementById('pruneAdminPin').value.trim();
+      const pinHash = await sha256(pin);
+      const adminBranch = branches.find(b => b.role === 'admin' && b.pinHash === pinHash);
+      if (!adminBranch) return showToast("Incorrect Admin Password / PIN!");
+
+      // Always save local backup before deleting
+      downloadOldDataBackup(false);
+
+      const { cutoff } = getOldRecords();
+      trades = trades.filter(t => {
+        const ms = parseTradeDate(t);
+        return !(ms > 0 && ms < cutoff);
+      });
+      ledger = ledger.filter(l => {
+        const ms = parseLedgerDateMs(l);
+        return !(ms > 0 && ms < cutoff);
+      });
+      saveState();
+
+      syncToGoogleSheet({ action: "prune_old_data", cutoffMs: cutoff });
+      closePruneModal();
+      renderAll();
+      showToast("Old (>6 month) data backed up & cleared!");
+    }
 
     function renderScriptsManager() {
       const tbody = document.getElementById('scriptsListBody');
