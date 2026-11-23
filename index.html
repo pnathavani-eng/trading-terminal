@@ -220,6 +220,20 @@
     </div>
   </div>
 
+
+  <!-- Set Contract Futures CMP Modal -->
+  <div id="setCmpModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-box">
+      <h3 style="margin-bottom:6px; font-size:16px; color:#38bdf8;">Set Futures CMP</h3>
+      <p id="setCmpContractLabel" style="font-size:12px; color:var(--muted); margin-bottom:12px;"></p>
+      <input type="number" id="setCmpInput" step="0.05" min="0.05" placeholder="Exact Futures Price" style="text-align:center; font-size:18px; margin-bottom:12px;">
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary" style="margin-top:0;" onclick="confirmSetContractCmp()">Save &amp; Sync CMP</button>
+        <button class="btn" style="background:#475569; color:#fff;" onclick="closeSetCmpModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Delete Trade Modal -->
   <div id="deleteModal" class="modal-backdrop" style="display:none;">
     <div class="modal-box">
@@ -1052,6 +1066,13 @@
               else trades.push(normalizedTrade);
             });
           }
+          if (data.liveRates && typeof data.liveRates === 'object') {
+            for (const cKey in data.liveRates) {
+              const p = Number(data.liveRates[cKey]);
+              if (p > 0) contractPrices[cKey.toUpperCase()] = p;
+            }
+            safeSetLS('app_contract_prices_v1', JSON.stringify(contractPrices));
+          }
           if (Array.isArray(data.scripts)) {
             customScripts = data.scripts;
             safeSetLS('app_custom_scripts_v1', JSON.stringify(customScripts));
@@ -1275,17 +1296,25 @@
     ].sort((a, b) => a.name.localeCompare(b.name));
     let customScripts = [];
     let livePrices = {};
+    let contractPrices = {};
+    try { contractPrices = JSON.parse(safeGetLS('app_contract_prices_v1', '{}')) || {}; } catch { contractPrices = {}; }
     try { customScripts = JSON.parse(safeGetLS('app_custom_scripts_v1', '[]')) || []; } catch { customScripts = []; }
     try { livePrices = JSON.parse(safeGetLS('app_live_prices_v1', '{}')) || {}; } catch { livePrices = {}; }
 
-    function saveLivePrice(sym, price) {
+    function saveLivePrice(sym, price, contract = '') {
       const p = Number(price);
-      if (!sym || !(p > 0)) return;
-      livePrices[sym] = p;
-      safeSetLS('app_live_prices_v1', JSON.stringify(livePrices));
-      const s = stockMap.get(sym);
-      if (s) s.price = p;
-      else stockMap.set(sym, { name: sym, lot: 1, price: p });
+      if (!(p > 0)) return;
+      if (contract) {
+        contractPrices[String(contract).toUpperCase()] = p;
+        safeSetLS('app_contract_prices_v1', JSON.stringify(contractPrices));
+      }
+      if (sym) {
+        livePrices[sym] = p;
+        safeSetLS('app_live_prices_v1', JSON.stringify(livePrices));
+        const s = stockMap.get(sym);
+        if (s) s.price = p;
+        else stockMap.set(sym, { name: sym, lot: 1, price: p });
+      }
     }
 
     function rebuildStockCatalog() {
@@ -1303,20 +1332,23 @@
     }
     rebuildStockCatalog();
 
-    async function fetchLivePriceForSymbol(sym, targetInputId = 'priceInput', applyNextMult = true) {
+    async function fetchLivePriceForSymbol(sym, targetInputId = 'priceInput', applyNextMult = true, explicitContract = '') {
       if (!GOOGLE_SCRIPT_URL || !sym) return;
       const btn = document.getElementById('refreshPriceBtn');
       if (btn) btn.innerText = "...";
+      const mCode = explicitContract ? (explicitContract.split(/\s+/)[1] || getActiveMonthCode()) : getActiveMonthCode();
+      const contract = explicitContract || `${sym} ${mCode} FUT`;
       try {
-        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&mode=live_price&symbol=${encodeURIComponent(sym)}`);
+        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&mode=live_price&symbol=${encodeURIComponent(sym)}&monthCode=${encodeURIComponent(mCode)}&contract=${encodeURIComponent(contract)}`);
         const data = await resp.json();
         if (data.status === "success" && data.price > 0) {
-          saveLivePrice(sym, data.price);
+          saveLivePrice(sym, data.price, contract);
           document.getElementById(targetInputId).value = Number(data.price).toFixed(2);
           renderAll();
-          showToast(`${sym} Latest Price: ₹${Number(data.price).toFixed(2)}`);
+          const srcTag = data.source === 'NSE_FUT' ? 'NSE FUT' : data.source === 'SHEET_FUT' ? 'Sheet FUT' : 'Cash Est.';
+          showToast(`${contract} (${srcTag}): ₹${Number(data.price).toFixed(2)}`);
         } else {
-          showToast(`Live rate unavailable for ${sym}`);
+          showToast(`Live rate unavailable for ${contract}`);
         }
       } catch {
         showToast("Offline — enter price manually.");
@@ -1328,31 +1360,30 @@
 
     async function refreshAllOpenPrices(silent = false) {
       if (!GOOGLE_SCRIPT_URL) return;
-      const openSyms = new Set();
+      const openContracts = new Set();
       getVisibleTrades().forEach(t => {
-        const sym = extractStockSymbol(t.contract);
-        if (sym) openSyms.add(sym);
+        if (t.contract) openContracts.add(t.contract.toUpperCase());
       });
-      const symsArr = Array.from(openSyms);
-      if (symsArr.length === 0) {
+      const contractsArr = Array.from(openContracts);
+      if (contractsArr.length === 0) {
         if (!silent) showToast("No open trades to refresh.");
         return;
       }
-      if (!silent) showToast("Fetching latest prices for " + symsArr.length + " script(s)...");
+      if (!silent) showToast("Fetching Futures CMP for " + contractsArr.length + " contract(s)...");
       try {
-        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&mode=batch_prices&symbols=${encodeURIComponent(symsArr.join(','))}`);
+        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&mode=batch_prices&contracts=${encodeURIComponent(contractsArr.join(','))}`);
         const data = await resp.json();
         if (data.status === "success" && data.prices) {
           let updated = 0;
-          for (const sym in data.prices) {
-            const p = Number(data.prices[sym]);
+          for (const cKey in data.prices) {
+            const p = Number(data.prices[cKey]);
             if (p > 0) {
-              saveLivePrice(sym, p);
+              saveLivePrice(extractStockSymbol(cKey), p, cKey);
               updated++;
             }
           }
           renderAll();
-          if (!silent) showToast(`Updated live/close CMP for ${updated} stock(s).`);
+          if (!silent) showToast(`Updated Futures CMP for ${updated} contract(s).`);
         }
       } catch {
         if (!silent) showToast("Offline — could not refresh CMP.");
@@ -1366,6 +1397,8 @@
     }
 
     function getCmpForContract(contract, fallbackRate) {
+      const cKey = String(contract || '').trim().toUpperCase();
+      if (contractPrices[cKey] > 0) return Number(contractPrices[cKey]);
       const sym = extractStockSymbol(contract);
       const stock = stockMap.get(sym);
       return (stock && stock.price > 0) ? Number(stock.price) : Number(fallbackRate || 0);
@@ -1379,7 +1412,7 @@
       const contract = document.getElementById('mtmContractSelect').value;
       if (!contract) return;
       const sym = extractStockSymbol(contract);
-      fetchLivePriceForSymbol(sym, 'mtmClosePrice', false);
+      fetchLivePriceForSymbol(sym, 'mtmClosePrice', false, contract);
     }
 
     function getVisibleClients() {
@@ -1531,7 +1564,8 @@
       const stock = stockMap.get(currentRawStock);
       if (stock) {
         document.getElementById('lotHint').innerText = `Ref Lot: ${stock.lot} (Any qty allowed)`;
-        document.getElementById('priceInput').value = Number(stock.price).toFixed(2);
+        const cPrice = contractPrices[contract.toUpperCase()] || stock.price;
+        document.getElementById('priceInput').value = Number(cPrice).toFixed(2);
       }
     }
 
@@ -1876,8 +1910,8 @@
       const contract = document.getElementById('mtmContractSelect').value;
       if (!contract) return;
       const sym = extractStockSymbol(contract);
-      const stock = stockMap.get(sym);
-      if (stock) document.getElementById('mtmClosePrice').value = stock.price;
+      const cPrice = getCmpForContract(contract, 0);
+      if (cPrice > 0) document.getElementById('mtmClosePrice').value = cPrice.toFixed(2);
     }
 
     // Friday Close MTM Settlement: squares off at closePrice (0% brokerage) and re-opens carry-forward at closePrice (0% brokerage)
@@ -1954,7 +1988,8 @@
       });
 
       if (settledCount === 0) return showToast("No open positions found for this contract!");
-      saveLivePrice(extractStockSymbol(contract), closePrice);
+      saveLivePrice(extractStockSymbol(contract), closePrice, contract);
+      syncToGoogleSheet({ action: 'save_contract_rate', contract: contract, symbol: extractStockSymbol(contract), expiry: '', price: closePrice });
       saveState();
       renderAll();
       showToast(`Friday MTM settled for ${settledCount} client(s) @ ₹${closePrice.toFixed(2)} (0% Brok)!`);
@@ -2012,7 +2047,7 @@
           <td class="${t.action==='BUY'?'green':'red'}">${escapeHtml(t.action)}</td>
           <td>${t.qty}</td>
           <td><b>₹${Number(t.netRate).toFixed(2)}</b></td>
-          <td>₹${cmp.toFixed(2)}</td>
+          <td>₹${cmp.toFixed(2)} <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:4px;" onclick="openSetCmpModal('${escapeHtml(contract)}', ${cmp})">Set</button></td>
           <td>${mtmHtml}</td>
           <td>${actionBtn}</td>
         </tr>`;
@@ -2095,7 +2130,7 @@
           <td>${item.buy} / ${item.sell}</td>
           <td>${netHtml}</td>
           <td><b>₹${avgRate.toFixed(2)}</b></td>
-          <td>₹${cmp.toFixed(2)}</td>
+          <td>₹${cmp.toFixed(2)} <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:4px;" onclick="openSetCmpModal('${escapeHtml(contract)}', ${cmp})">Set</button></td>
           <td>${mtmHtml}</td>
           <td>${brBreakdown}</td>
         </tr>`);
@@ -2891,6 +2926,32 @@
       closeEditTradeModal();
       renderAll();
       showToast(`Trade updated: ${t.contract} (${side} ${qty}) @ ₹${netRate.toFixed(2)}`);
+    }
+
+
+    let pendingSetCmpContract = null;
+    function openSetCmpModal(contract, currentVal) {
+      if (!currentSession || currentSession.role !== 'admin') return;
+      pendingSetCmpContract = contract;
+      document.getElementById('setCmpContractLabel').innerText = contract;
+      document.getElementById('setCmpInput').value = Number(currentVal || 0).toFixed(2);
+      document.getElementById('setCmpModal').style.display = 'flex';
+    }
+    function closeSetCmpModal() {
+      pendingSetCmpContract = null;
+      document.getElementById('setCmpModal').style.display = 'none';
+    }
+    function confirmSetContractCmp() {
+      if (!pendingSetCmpContract) return;
+      const p = parseFloat(document.getElementById('setCmpInput').value) || 0;
+      if (p <= 0) return showToast("Enter valid Futures CMP!");
+      const contract = pendingSetCmpContract;
+      const sym = extractStockSymbol(contract);
+      saveLivePrice(sym, p, contract);
+      syncToGoogleSheet({ action: 'save_contract_rate', contract: contract, symbol: sym, expiry: '', price: p });
+      closeSetCmpModal();
+      renderAll();
+      showToast(`${contract} CMP set to ₹${p.toFixed(2)} & synced!`);
     }
 
     function openDeleteModal(tradeId) {
