@@ -1202,14 +1202,31 @@
       { name: "ZOMATO", lot: 2425, price: 260.0 }, { name: "ZYDUSLIFE", lot: 900, price: 1050.0 }
     ].sort((a, b) => a.name.localeCompare(b.name));
     let customScripts = [];
+    let livePrices = {};
     try { customScripts = JSON.parse(safeGetLS('app_custom_scripts_v1', '[]')) || []; } catch { customScripts = []; }
-    let stockMap = new Map();
+    try { livePrices = JSON.parse(safeGetLS('app_live_prices_v1', '{}')) || {}; } catch { livePrices = {}; }
+
+    function saveLivePrice(sym, price) {
+      const p = Number(price);
+      if (!sym || !(p > 0)) return;
+      livePrices[sym] = p;
+      safeSetLS('app_live_prices_v1', JSON.stringify(livePrices));
+      const s = stockMap.get(sym);
+      if (s) s.price = p;
+      else stockMap.set(sym, { name: sym, lot: 1, price: p });
+    }
+
     function rebuildStockCatalog() {
       const merged = new Map(fnoDatabase.map(s => [s.name, { ...s }]));
       customScripts.forEach(cs => {
         if (cs.status === 'DELETED') merged.delete(cs.name);
         else merged.set(cs.name, { name: cs.name, lot: Number(cs.lot) || 1, price: Number(cs.price) || 100 });
       });
+      for (const sym in livePrices) {
+        if (merged.has(sym) && Number(livePrices[sym]) > 0) {
+          merged.get(sym).price = Number(livePrices[sym]);
+        }
+      }
       stockMap = merged;
     }
     rebuildStockCatalog();
@@ -1222,11 +1239,10 @@
         const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&mode=live_price&symbol=${encodeURIComponent(sym)}`);
         const data = await resp.json();
         if (data.status === "success" && data.price > 0) {
-          const stock = stockMap.get(sym);
-          if (stock) stock.price = data.price;
-          const val = (applyNextMult && selectedExpiryType === 'NEXT') ? (data.price * 1.008).toFixed(2) : data.price.toFixed(2);
-          document.getElementById(targetInputId).value = val;
-          showToast(`${sym} Latest Close: ₹${data.price.toFixed(2)}`);
+          saveLivePrice(sym, data.price);
+          document.getElementById(targetInputId).value = Number(data.price).toFixed(2);
+          renderAll();
+          showToast(`${sym} Latest Price: ₹${Number(data.price).toFixed(2)}`);
         } else {
           showToast(`Live rate unavailable for ${sym}`);
         }
@@ -1259,9 +1275,7 @@
           for (const sym in data.prices) {
             const p = Number(data.prices[sym]);
             if (p > 0) {
-              const s = stockMap.get(sym);
-              if (s) s.price = p;
-              else stockMap.set(sym, { name: sym, lot: 1, price: p });
+              saveLivePrice(sym, p);
               updated++;
             }
           }
@@ -1442,7 +1456,7 @@
       const stock = stockMap.get(currentRawStock);
       if (stock) {
         document.getElementById('lotHint').innerText = `Ref Lot: ${stock.lot} (Any qty allowed)`;
-        document.getElementById('priceInput').value = selectedExpiryType === 'CURRENT' ? stock.price : (stock.price * 1.008).toFixed(2);
+        document.getElementById('priceInput').value = Number(stock.price).toFixed(2);
       }
     }
 
@@ -1864,6 +1878,7 @@
       });
 
       if (settledCount === 0) return showToast("No open positions found for this contract!");
+      saveLivePrice(extractStockSymbol(contract), closePrice);
       saveState();
       renderAll();
       showToast(`Friday MTM settled for ${settledCount} client(s) @ ₹${closePrice.toFixed(2)} (0% Brok)!`);
