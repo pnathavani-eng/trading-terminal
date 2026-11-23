@@ -2074,7 +2074,7 @@
           <td class="${t.action==='BUY'?'green':'red'}">${escapeHtml(t.action)}</td>
           <td>${t.qty}</td>
           <td><b>₹${Number(t.netRate).toFixed(2)}</b></td>
-          <td>₹${cmp.toFixed(2)} <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:4px;" onclick="openSetCmpModal('${escapeHtml(contract)}', ${cmp})">Set</button></td>
+          <td>₹${cmp.toFixed(2)} <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:4px;" onclick="openSetCmpModal('${escapeHtml(t.contract)}', ${cmp})">Set</button></td>
           <td>${mtmHtml}</td>
           <td>${actionBtn}</td>
         </tr>`;
