@@ -208,6 +208,30 @@
 
 
   <!-- Prune Old Data Modal -->
+    <div id="editBranchModal" class="modal" style="z-index:10040;">
+    <div class="modal-card">
+      <div class="card-title">Edit Branch Share %</div>
+      <div id="editBranchLabel" style="font-size:12px; color:var(--muted); margin-bottom:10px;"></div>
+      <label>Sub-Broker Share (%)</label>
+      <input type="number" id="editBranchShareInput" min="0" max="100" step="1">
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button class="btn btn-primary" style="margin-top:0;" onclick="confirmEditBranchShare()">Save Share %</button>
+        <button class="btn" style="background:#475569; color:#fff; margin-top:0;" onclick="closeEditBranchModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="appConfirmModal" class="modal" style="z-index:10050;">
+    <div class="modal-card">
+      <div class="card-title" id="appConfirmTitle">Confirm Action</div>
+      <div id="appConfirmMsg" style="font-size:12px; color:var(--text); margin-bottom:14px; white-space:pre-line; line-height:1.5;"></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary" id="appConfirmOkBtn" style="margin-top:0;">Confirm</button>
+        <button class="btn" id="appConfirmCancelBtn" style="background:#475569; color:#fff; margin-top:0;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="pruneDataModal" class="modal-backdrop" style="display:none;">
     <div class="modal-box">
       <h3 style="margin-bottom:8px; font-size:16px; color:#f59e0b;">Confirm 6-Month Data Cleanup</h3>
@@ -353,9 +377,9 @@
           <input type="number" id="qtyInput" value="250" min="1" step="1">
         </div>
         <div>
-          <label id="priceLabel">Execution Price (FUT)</label>
+          <label id="priceLabel"><span id="priceLabelText">Execution Price (FUT)</span> <span id="priceSourceTag"></span></label>
           <div class="price-row">
-            <input type="number" id="priceInput" value="1175.00" step="0.05" min="0.05">
+            <input type="number" id="priceInput" value="" placeholder="Fetch or enter CMP" step="0.05" min="0.05">
             <button type="button" class="btn-mini" id="refreshPriceBtn" onclick="fetchLivePriceForCurrent()">Refresh</button>
           </div>
         </div>
@@ -410,7 +434,10 @@
     <div class="card">
       <div class="card-title">
         <span>Master Broker Pool <small id="poolMtmTotal" style="margin-left:6px;"></small></span>
-        <div style="display:flex; gap:6px;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--muted); margin:0; cursor:pointer; font-weight:normal;">
+            <input type="checkbox" id="poolShowSquaredToggle" onchange="renderMasterPool()" style="width:auto; margin:0;"> Squared બતાવો
+          </label>
           <button class="btn-mini" style="padding:5px 9px;" onclick="refreshAllOpenPrices()">Refresh CMP</button>
           <button class="btn-edit" onclick="syncFromGoogleSheet(true)" style="margin:0;">Sync Sheet</button>
         </div>
@@ -437,9 +464,18 @@
   <!-- TAB 3: Statements & Friday MTM -->
   <div id="billingTab" class="tab-content" style="display:none;">
     <div class="card">
-      <div class="card-title">
-        <span>Weekly Settlement (FIFO + Cash Ledger Balance)</span>
-        <small id="weekRangeDisplay" style="color:var(--muted); font-size:11px;"></small>
+      <div class="card-title" style="flex-wrap:wrap; gap:8px;">
+        <span>Weekly Settlement (FIFO + Cash Ledger)</span>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <select id="billWeekSelector" onchange="renderAll()" style="width:auto; padding:4px 8px; font-size:11px;">
+            <option value="0">Current Week</option>
+            <option value="-1">Last Week</option>
+            <option value="-2">2 Weeks Ago</option>
+            <option value="-3">3 Weeks Ago</option>
+            <option value="ALL">All History</option>
+          </select>
+          <small id="weekRangeDisplay" style="color:var(--muted); font-size:11px;"></small>
+        </div>
       </div>
       <div class="table-wrap">
         <table>
@@ -461,9 +497,17 @@
 
     
     <div class="card" id="subBrokerSummaryCard">
-      <div class="card-title">
+      <div class="card-title" style="flex-wrap:wrap; gap:8px;">
         <span>Sub-Broker Brokerage Sharing Summary</span>
-        <small style="color:var(--muted); font-weight:normal;">Estimated Turnover Brokerage</small>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <select id="subBrokerPeriodFilter" onchange="renderSubBrokerSummary()" style="width:auto; padding:4px 8px; font-size:11px;">
+            <option value="THIS_WEEK">This Week</option>
+            <option value="LAST_WEEK">Last Week</option>
+            <option value="THIS_MONTH">This Month</option>
+            <option value="ALL">All Time</option>
+          </select>
+          <small style="color:var(--muted); font-weight:normal;">Stored Brokerage (Excl. MTM Roll)</small>
+        </div>
       </div>
       <div class="table-wrap">
         <table>
@@ -501,6 +545,23 @@
         </div>
       </div>
       <button class="btn btn-primary" onclick="settleFridayMTM()">Settle Friday MTM & Roll Carry-Forward</button>
+      <div style="border-top:1px solid var(--border); margin-top:14px; padding-top:12px;">
+        <div style="font-size:12px; font-weight:700; color:var(--amber); margin-bottom:8px;">Settle Expired Contract (Final Expiry Square-off)</div>
+        <div class="form-grid">
+          <div>
+            <label>Select Open / Expired Contract</label>
+            <select id="expiredContractSelect" onchange="autoFillExpiredPrice()"></select>
+          </div>
+          <div>
+            <label>Final Settlement Price</label>
+            <div class="price-row">
+              <input type="number" id="expiredSettlePrice" step="0.05" min="0.05" placeholder="Settlement Price">
+              <button type="button" class="btn-mini" onclick="fetchLivePriceForExpired()">Fetch</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn" style="background:var(--amber); color:#0f172a; margin-top:8px;" onclick="settleExpiredContract()">Settle Expired Contract</button>
+      </div>
     </div>
   </div>
 
@@ -633,7 +694,7 @@
           <input type="text" id="newBranchOperator" placeholder="e.g. Rameshbhai">
         </div>
         <div>
-          <label>Branch Login Password / PIN</label>
+          <label>Branch Login Password (min 8 chars)</label>
           <input type="password" id="newBranchPin" placeholder="e.g. Morbi@2026">
         </div>
         <div class="full-width">
@@ -670,7 +731,11 @@
           <select id="pinTargetBranch"></select>
         </div>
         <div class="full-width">
-          <label>New Strong Password / PIN (letters, numbers & symbols allowed)</label>
+          <label>Current / Old Password (or Admin Password)</label>
+          <input type="password" id="oldBranchPinUpdate" placeholder="Enter current password">
+        </div>
+        <div class="full-width">
+          <label>New Strong Password (min 8 characters)</label>
           <div class="price-row">
             <input type="password" id="newBranchPinUpdate" placeholder="e.g. Rajkot@2026#" oninput="checkPassStrength()">
             <button type="button" class="btn-mini" onclick="togglePassVis('newBranchPinUpdate', this)">Show</button>
@@ -742,15 +807,7 @@
 
   <script>
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwlBVirHkMzPuzd1xOOak6tTPv8-moSehHCig3RFJEFr-gO2ut_Y9xwtQiQBWOhOpjkoA/exec";
-    const SECRET_TOKEN = "NSE_TRADING_SECURE_TOKEN_2026";
-
-    const HASH_9999 = "888df25ae35772424a560c7152a1de794440e0ea5cfee62828333a456a506e05";
-    const HASH_1111 = "0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c";
-
-    const DEFAULT_BRANCHES = [
-      { id: "rajkot", name: "Rajkot HQ", prefix: "R", pinHash: HASH_9999, role: "admin", operatorName: "Rajkot Admin", sharePct: "0%", active: true },
-      { id: "surat", name: "Surat Branch", prefix: "N", pinHash: HASH_1111, role: "sub", operatorName: "Nareshbhai", sharePct: "40%", active: true }
-    ];
+    let sessionToken = safeGetLS("app_session_token_v1", "");
 
     function safeGetLS(key, fallback = null) {
       try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
@@ -764,11 +821,28 @@
     let currentRawStock = 'RELIANCE';
     let isEditingClientId = null;
     let pendingDeleteTradeId = null;
+    let pendingReqCancelTradeId = null;
     let pendingRemoveClientId = null;
     let pendingOrder = null;
+    let stockMap = new Map();
+    let tradesByClientMap = new Map();
+    let ledgerByClientMap = new Map();
+
+    function generateShortId(prefix = 'TR_') {
+      try {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          return prefix + crypto.randomUUID().slice(0, 8);
+        }
+      } catch {}
+      return prefix + Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 6);
+    }
     let inactivityTimer = null;
     let syncIntervalId = null;
     let lockTickId = null;
+    let isSyncing = false;
+    let lastSyncDigest = '';
+    let outboxQueue = [];
+    try { outboxQueue = JSON.parse(safeGetLS('app_outbox_v1', '[]')) || []; } catch { outboxQueue = []; }
 
     function showToast(msg) {
       const t = document.getElementById('toast');
@@ -842,12 +916,12 @@
       let loadedTrades = [];
       let loadedLedger = [];
       try {
-        loadedBranches = JSON.parse(safeGetLS('app_branches_v7', 'null')) || DEFAULT_BRANCHES;
+        loadedBranches = JSON.parse(safeGetLS('app_branches_v7', '[]')) || [];
         loadedClients = JSON.parse(safeGetLS('app_clients_v5', 'null')) || [];
         loadedTrades = JSON.parse(safeGetLS('app_trades_v5', 'null')) || [];
         loadedLedger = JSON.parse(safeGetLS('app_ledger_v1', 'null')) || [];
       } catch {
-        loadedBranches = DEFAULT_BRANCHES;
+        loadedBranches = [];
         loadedClients = [];
         loadedTrades = [];
         loadedLedger = [];
@@ -880,87 +954,47 @@
       safeSetLS('app_ledger_v1', JSON.stringify(ledger));
     }
 
-    function checkLockout() {
-      const lockUntil = parseInt(safeGetLS('app_lock_until', '0'), 10);
-      const now = Date.now();
-      if (now < lockUntil) {
-        const remaining = Math.ceil((lockUntil - now) / 1000);
-        document.getElementById('lockStatusMsg').innerText = `Terminal locked! Try again in ${remaining}s.`;
-        if (!lockTickId) {
-          lockTickId = setInterval(() => {
-            const left = Math.ceil((parseInt(safeGetLS('app_lock_until', '0'), 10) - Date.now()) / 1000);
-            if (left <= 0) {
-              clearInterval(lockTickId);
-              lockTickId = null;
-              document.getElementById('lockStatusMsg').innerText = "Enter Security PIN to unlock";
-            } else {
-              document.getElementById('lockStatusMsg').innerText = `Terminal locked! Try again in ${left}s.`;
-            }
-          }, 1000);
-        }
-        return true;
-      }
-      return false;
-    }
-
-    async function fetchBranchesForLogin() {
-      if (!GOOGLE_SCRIPT_URL) return;
-      try {
-        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&mode=branches`);
-        const data = await resp.json();
-        if (data.status === "success" && Array.isArray(data.branches) && data.branches.length > 0) {
-          branches = data.branches.map(b => ({
-            ...b,
-            id: normalizeBranch(b.id),
-            prefix: String(b.prefix || 'B').toUpperCase()
-          }));
-          saveState();
-        }
-      } catch {}
-    }
-
     async function verifyLogin() {
-      if (checkLockout()) return;
       const pin = document.getElementById('pinInput').value.trim();
-      if (!pin) return showToast("Enter PIN!");
+      if (!pin) return showToast("Enter Password!");
 
       const loginBtn = document.getElementById('loginBtn');
       loginBtn.disabled = true;
       loginBtn.innerText = "Verifying...";
 
-      await fetchBranchesForLogin();
-      const enteredHash = await sha256(pin);
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 12000);
+        const resp = await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          redirect: "follow",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "login", pin: pin }),
+          signal: ctrl.signal
+        });
+        clearTimeout(tid);
+        const data = await resp.json();
 
-      loginBtn.disabled = false;
-      loginBtn.innerText = "Login";
-
-      const matchedBranch = branches.find(b => b.active !== false && b.pinHash === enteredHash);
-      if (matchedBranch) {
-        currentSession = {
-          branchId: matchedBranch.id,
-          branchName: matchedBranch.name,
-          role: matchedBranch.role === 'admin' ? 'admin' : 'sub',
-          prefix: matchedBranch.prefix || 'B',
-          operatorName: matchedBranch.operatorName || matchedBranch.name
-        };
-        completeLogin();
-      } else {
-        let attempts = parseInt(safeGetLS('app_failed_attempts', '0'), 10) + 1;
-        if (attempts >= 3) {
-          safeSetLS('app_lock_until', String(Date.now() + 30000));
-          safeSetLS('app_failed_attempts', '0');
-          showToast("3 Failed Attempts! Locked for 30s.");
-          checkLockout();
+        if (data.status === "success" && data.session && data.token) {
+          sessionToken = data.token;
+          safeSetLS("app_session_token_v1", sessionToken);
+          currentSession = data.session;
+          completeLogin();
         } else {
-          safeSetLS('app_failed_attempts', String(attempts));
-          showToast(`Invalid PIN! Attempts left: ${3 - attempts}`);
+          document.getElementById('lockStatusMsg').innerText = data.message || "Invalid Password!";
+          showToast(data.message || "Invalid Password!");
         }
+      } catch (e) {
+        showToast("Server unreachable — online login required.");
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.innerText = "Login";
       }
     }
 
     function completeLogin() {
-      safeSetLS('app_failed_attempts', '0');
       document.getElementById('pinInput').value = '';
+      document.getElementById('lockStatusMsg').innerText = "Enter Password to unlock";
       document.getElementById('loginScreen').style.display = 'none';
       resetInactivityTimer();
       initApp();
@@ -968,13 +1002,44 @@
     }
 
     function logout() {
+      const tok = sessionToken;
+      if (tok && GOOGLE_SCRIPT_URL) {
+        fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          redirect: "follow",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "logout", token: tok })
+        }).catch(() => {});
+      }
       currentSession = null;
+      sessionToken = "";
+      clients = [];
+      trades = [];
+      ledger = [];
+      branches = [];
+      customScripts = [];
+      livePrices = {};
+      contractPrices = {};
+      priceSources = {};
+      contractPriceMeta = {};
+      outboxQueue = [];
+      lastSyncDigest = '';
+      try {
+        ['app_session_token_v1', 'app_clients_v5', 'app_trades_v5', 'app_ledger_v1', 'app_branches_v7', 'app_custom_scripts_v1', 'app_live_prices_v1', 'app_contract_prices_v1', 'app_contract_price_meta_v1', 'app_outbox_v1'].forEach(k => localStorage.removeItem(k));
+      } catch {}
+      ['orderModal','editTradeModal','deleteModal','reqCancelModal','removeClientModal','billPreviewModal','setCmpModal','pruneDataModal','appConfirmModal','editBranchModal'].forEach(mid => {
+        const mel = document.getElementById(mid);
+        if (mel) mel.style.display = 'none';
+      });
+      pendingOrder = null; pendingEditTradeId = null; pendingDeleteTradeId = null; pendingReqCancelTradeId = null; pendingRemoveClientId = null;
       clearTimeout(inactivityTimer);
       clearInterval(syncIntervalId);
       syncIntervalId = null;
       document.getElementById('tradesBody').innerHTML = '';
       document.getElementById('billsBody').innerHTML = '';
       document.getElementById('masterPoolBody').innerHTML = '';
+      document.getElementById('clientsListBody').innerHTML = '';
+      document.getElementById('ledgerHistoryBody').innerHTML = '';
       document.getElementById('loginScreen').style.display = 'flex';
     }
 
@@ -988,12 +1053,21 @@
         }
       }, 5 * 60 * 1000);
     }
-    document.addEventListener('mousemove', resetInactivityTimer);
-    document.addEventListener('keypress', resetInactivityTimer);
-    document.addEventListener('touchstart', resetInactivityTimer);
+    ['mousemove', 'keypress', 'keydown', 'click', 'scroll', 'touchstart'].forEach(ev => {
+      document.addEventListener(ev, resetInactivityTimer, { passive: true });
+    });
     document.getElementById('pinInput').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') verifyLogin();
     });
+
+
+    function isAnyModalOpen() {
+      const modalIds = ['orderModal', 'editTradeModal', 'deleteModal', 'reqCancelModal', 'removeClientModal', 'billPreviewModal', 'setCmpModal', 'pruneDataModal'];
+      return modalIds.some(id => {
+        const el = document.getElementById(id);
+        return el && el.style.display !== 'none' && el.style.display !== '';
+      });
+    }
 
     function setSyncBadge(state, label) {
       const badge = document.getElementById('syncStatusBadge');
@@ -1001,17 +1075,128 @@
       badge.innerText = label;
     }
 
-    async function syncFromGoogleSheet(manual = false) {
-      if (!GOOGLE_SCRIPT_URL || !currentSession) return;
-      setSyncBadge('warn', 'Syncing...');
-      if (manual) showToast("Connecting to Google Sheet...");
-      const branchQuery = currentSession.role === 'admin' ? 'admin' : currentSession.branchId;
+    function saveOutbox() {
+      safeSetLS('app_outbox_v1', JSON.stringify(outboxQueue));
+      if (outboxQueue.length > 0) {
+        setSyncBadge('warn', `Pending (${outboxQueue.length})`);
+      }
+    }
+
+    function enqueueOutbox(payload, localType, localRecord) {
+      outboxQueue.push({
+        qid: "Q_" + crypto.randomUUID().slice(0, 8),
+        payload,
+        localType,
+        localRecord
+      });
+      saveOutbox();
+    }
+
+    async function flushOutbox() {
+      if (!GOOGLE_SCRIPT_URL || !currentSession || outboxQueue.length === 0) return true;
+      while (outboxQueue.length > 0) {
+        if (!currentSession) return false;
+        const item = outboxQueue[0];
+        const res = await postToServerRaw(item.payload, true);
+        if (res.unauthorized) {
+          showToast('Session expired — please login again.');
+          logout();
+          return false;
+        }
+        if (res.ok || res.duplicateOk) {
+          outboxQueue.shift();
+          saveOutbox();
+        } else if (res.offline) {
+          setSyncBadge('warn', `Pending (${outboxQueue.length})`);
+          return false;
+        } else {
+          // Permanent script/validation error: drop bad item and notify
+          outboxQueue.shift();
+          saveOutbox();
+          showToast('Sync Error: ' + (res.message || 'Server rejected pending entry'));
+        }
+      }
+      return true;
+    }
+
+    async function postToServerRaw(payload, isRetry = false) {
+      if (!GOOGLE_SCRIPT_URL) return { ok: false, offline: true, message: 'No Script URL' };
+      const bodyObj = { ...payload, token: sessionToken };
       try {
         const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 12000);
-        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&branch=${encodeURIComponent(branchQuery)}`, { signal: ctrl.signal });
+        const tid = setTimeout(() => ctrl.abort(), 25000);
+        const resp = await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          redirect: "follow",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(bodyObj),
+          signal: ctrl.signal
+        });
         clearTimeout(tid);
+        if (!currentSession) return { ok: false, aborted: true };
         const data = await resp.json();
+        if (data && data.status === "success") {
+          return { ok: true, data };
+        }
+        if (data && data.status === "unauthorized") {
+          return { ok: false, unauthorized: true, message: data.message };
+        }
+        if (data && data.status === "duplicate") {
+          if (isRetry) return { ok: true, duplicateOk: true, data };
+          return { ok: false, duplicate: true, message: data.message || 'Duplicate record' };
+        }
+        return { ok: false, scriptError: true, message: (data && data.message) || 'Script error' };
+      } catch (err) {
+        return { ok: false, offline: true, message: err && err.name === 'AbortError' ? 'Timeout (25s)' : 'Offline / Network error' };
+      }
+    }
+
+    async function syncToGoogleSheet(payload, localType = null, localRecord = null) {
+      const res = await postToServerRaw(payload, false);
+      if (res.aborted) return false;
+      if (res.unauthorized) {
+        showToast('Session expired — please login again.');
+        logout();
+        return false;
+      }
+      if (res.ok) {
+        if (outboxQueue.length === 0) setSyncBadge('ok', 'Synced');
+        return res.data || true;
+      }
+      if (res.offline) {
+        if (localType && localRecord) {
+          enqueueOutbox(payload, localType, localRecord);
+          showToast(`Offline: saved locally (Pending ${outboxQueue.length})`);
+        } else {
+          setSyncBadge('warn', outboxQueue.length > 0 ? `Pending (${outboxQueue.length})` : 'Offline');
+          showToast('Offline: could not reach server.');
+        }
+        return false;
+      }
+      setSyncBadge('err', 'Script Error');
+      showToast('Server Error: ' + (res.message || 'Failed'));
+      return false;
+    }
+
+    async function syncFromGoogleSheet(manual = false) {
+      if (!GOOGLE_SCRIPT_URL || !currentSession || isSyncing) return;
+      isSyncing = true;
+      setSyncBadge('warn', outboxQueue.length > 0 ? `Pending (${outboxQueue.length})` : 'Syncing...');
+      if (manual) showToast("Syncing with Google Sheet...");
+
+      try {
+        await flushOutbox();
+        if (!currentSession) return;
+
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 25000);
+        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(sessionToken)}`, { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (!currentSession) return;
+
+        const data = await resp.json();
+        if (!currentSession) return;
+
         if (data.status === "success") {
           if (Array.isArray(data.branches) && data.branches.length > 0) {
             branches = data.branches.map(b => ({
@@ -1020,163 +1205,176 @@
               prefix: String(b.prefix || 'B').toUpperCase()
             }));
           }
-          if (Array.isArray(data.clients)) {
-            data.clients.forEach(sc => {
-              const cid = String(sc.id || sc.client_id || '').trim();
-              if (!cid) return;
-              const normalized = {
-                id: cid,
-                name: String(sc.name || '').trim(),
-                mobile: String(sc.mobile || sc.phone || '').trim(),
-                rate: parseRate(sc.rate ?? sc.brokerage_rate),
-                branch: normalizeBranch(sc.branch),
-                active: sc.active !== false && String(sc.active).toUpperCase() !== 'FALSE'
-              };
-              const idx = clients.findIndex(c => c.id === cid);
-              if (idx !== -1) clients[idx] = { ...clients[idx], ...normalized };
-              else clients.push(normalized);
-            });
-          }
-          if (Array.isArray(data.trades)) {
-            data.trades.forEach(st => {
-              const tid = String(st.id || st.trade_id || '').trim();
-              if (!tid) return;
-              const side = String(st.action || st.side || '').toUpperCase();
-              if (side !== 'BUY' && side !== 'SELL') return;
-              const basePrice = Number(st.basePrice || st.buy_price || st.price) || 0;
-              const netRate = Number(st.netRate || st.net_rate || st.cmp || basePrice) || basePrice;
-              const normalizedTrade = {
-                id: tid,
-                timestamp: String(st.timestamp || '').trim(),
-                branch: normalizeBranch(st.branch),
-                clientId: String(st.clientId || st.client_id || '').trim(),
-                clientName: String(st.clientName || st.client_name || '').trim(),
-                contract: String(st.contract || st.stock || '').trim(),
-                action: side,
-                qty: Number(st.qty) || 0,
-                basePrice: basePrice,
-                netRate: netRate,
-                expiry: String(st.expiry || '').trim(),
-                status: String(st.status || 'OPEN').toUpperCase(),
-                cancelReason: String(st.cancelReason || st.cancel_reason || '').trim(),
-                cancelReq: String(st.status || '').toUpperCase() === 'PENDING_CANCEL' ||
-                           String(st.cancellation_requested || '').toUpperCase() === 'YES' ||
-                           String(st.cancellationRequested || '').toUpperCase() === 'REQUESTED'
-              };
-              const idx = trades.findIndex(t => t.id === tid);
-              if (idx !== -1) trades[idx] = { ...trades[idx], ...normalizedTrade };
-              else trades.push(normalizedTrade);
-            });
-          }
+
+          let nextClients = Array.isArray(data.clients) ? data.clients.map(sc => ({
+            id: String(sc.id || sc.client_id || '').trim(),
+            name: String(sc.name || '').trim(),
+            mobile: String(sc.mobile || sc.phone || '').trim(),
+            rate: parseRate(sc.rate ?? sc.brokerage_rate),
+            branch: normalizeBranch(sc.branch),
+            active: sc.active !== false && String(sc.active).toUpperCase() !== 'FALSE'
+          })).filter(c => c.id) : clients;
+
+          let nextTrades = Array.isArray(data.trades) ? data.trades.map(st => {
+            const tid = String(st.id || st.trade_id || '').trim();
+            const side = String(st.action || st.side || '').toUpperCase();
+            const stStatus = String(st.status || 'OPEN').toUpperCase();
+            const cReq = String(st.cancellation_requested || st.cancellationRequested || '').toUpperCase();
+            const basePrice = Number(st.basePrice || st.buy_price || st.price) || 0;
+            const netRate = Number(st.netRate || st.net_rate || st.cmp || basePrice) || basePrice;
+            return {
+              id: tid,
+              timestamp: String(st.timestamp || '').trim(),
+              isoDate: String(st.isoDate || '').trim(),
+              branch: normalizeBranch(st.branch),
+              clientId: String(st.clientId || st.client_id || '').trim(),
+              clientName: String(st.clientName || st.client_name || '').trim(),
+              contract: String(st.contract || st.stock || '').trim(),
+              action: side,
+              qty: Number(st.qty) || 0,
+              basePrice: basePrice,
+              netRate: netRate,
+              expiry: String(st.expiry || '').trim(),
+              status: stStatus,
+              cancelReason: String(st.cancelReason || st.cancel_reason || '').trim(),
+              cancelReq: stStatus === 'PENDING_CANCEL' || (stStatus !== 'OPEN' && ['YES', 'REQUESTED', 'TRUE'].includes(cReq)),
+              tradeType: String(st.tradeType || st.trade_type || ((basePrice > 0 && Math.abs(netRate - basePrice) < 0.0001) ? 'MTM_ROLL' : 'NORMAL')).toUpperCase(),
+              brokerageRate: (st.brokerageRate !== undefined && st.brokerageRate !== '') ? Number(st.brokerageRate) : 0.01,
+              brokerageAmt: (st.brokerageAmt !== undefined && st.brokerageAmt !== '') ? Number(st.brokerageAmt) : Number((Math.abs(netRate - basePrice) * (Number(st.qty) || 0)).toFixed(2))
+            };
+          }).filter(t => t.id && (t.action === 'BUY' || t.action === 'SELL')) : trades;
+
+          let nextLedger = Array.isArray(data.ledger) ? data.ledger.map(sl => ({
+            id: String(sl.id || sl.entry_id || '').trim(),
+            date: String(sl.date || '').trim(),
+            clientId: String(sl.clientId || sl.client_id || '').trim(),
+            clientName: String(sl.clientName || sl.client_name || '').trim(),
+            branch: normalizeBranch(sl.branch),
+            type: String(sl.type || '').toUpperCase(),
+            debit: Number(sl.debit) || 0,
+            credit: Number(sl.credit) || 0,
+            remarks: String(sl.remarks || '').trim()
+          })).filter(l => l.id) : ledger;
+
+          // Merge any still-pending outbox items so unsynced local records are never lost
+          outboxQueue.forEach(q => {
+            if (q.localType === 'trade' && q.localRecord && !nextTrades.some(t => t.id === q.localRecord.id)) {
+              nextTrades.push(q.localRecord);
+            } else if (q.localType === 'ledger' && q.localRecord && !nextLedger.some(l => l.id === q.localRecord.id)) {
+              nextLedger.push(q.localRecord);
+            } else if (q.localType === 'client' && q.localRecord && !nextClients.some(c => c.id === q.localRecord.id)) {
+              nextClients.push(q.localRecord);
+            }
+          });
+
+          clients = nextClients;
+          trades = nextTrades;
+          ledger = nextLedger;
+
           if (data.liveRates && typeof data.liveRates === 'object') {
             for (const cKey in data.liveRates) {
-              const p = Number(data.liveRates[cKey]);
-              if (p > 0) contractPrices[cKey.toUpperCase()] = p;
+              const entry = data.liveRates[cKey];
+              const p = (entry && typeof entry === 'object') ? Number(entry.price) : Number(entry);
+              const src = (entry && typeof entry === 'object' && entry.source) ? String(entry.source) : 'SHEET_FUT';
+              const ts = (entry && typeof entry === 'object' && Number(entry.updatedAtMs) > 0) ? Number(entry.updatedAtMs) : Date.now();
+              if (p > 0) {
+                const k = cKey.toUpperCase();
+                contractPrices[k] = p;
+                priceSources[k] = src;
+                contractPriceMeta[k] = { price: p, source: src, updatedAtMs: ts };
+              }
             }
             safeSetLS('app_contract_prices_v1', JSON.stringify(contractPrices));
+            safeSetLS('app_contract_price_meta_v1', JSON.stringify(contractPriceMeta));
           }
           if (Array.isArray(data.scripts)) {
             customScripts = data.scripts;
             safeSetLS('app_custom_scripts_v1', JSON.stringify(customScripts));
             rebuildStockCatalog();
           }
-          if (Array.isArray(data.ledger)) {
-            data.ledger.forEach(sl => {
-              const lid = String(sl.id || sl.entry_id || '').trim();
-              if (!lid) return;
-              const normalizedLedger = {
-                id: lid,
-                date: String(sl.date || '').trim(),
-                clientId: String(sl.clientId || sl.client_id || '').trim(),
-                clientName: String(sl.clientName || sl.client_name || '').trim(),
-                branch: normalizeBranch(sl.branch),
-                type: String(sl.type || '').toUpperCase(),
-                debit: Number(sl.debit) || 0,
-                credit: Number(sl.credit) || 0,
-                remarks: String(sl.remarks || '').trim()
-              };
-              const idx = ledger.findIndex(l => l.id === lid);
-              if (idx !== -1) ledger[idx] = { ...ledger[idx], ...normalizedLedger };
-              else ledger.push(normalizedLedger);
-            });
-          }
+
           saveState();
           autoGenerateClientId();
-          setSyncBadge('ok', 'Synced');
-          renderAll();
+          if (outboxQueue.length > 0) {
+            setSyncBadge('warn', `Pending (${outboxQueue.length})`);
+          } else {
+            setSyncBadge('ok', 'Synced');
+          }
+
+          const newDigest = JSON.stringify({ clients, trades, ledger, branches, customScripts, contractPrices });
+          if (manual || (newDigest !== lastSyncDigest && !isAnyModalOpen())) {
+            lastSyncDigest = newDigest;
+            renderAll();
+          }
+
           if (manual) showToast(`Synced! Clients: ${clients.filter(c=>c.active!==false).length}, Trades: ${trades.filter(t=>t.status!=='CANCELLED').length}`);
           if (!window._didInitialCmpSync) { window._didInitialCmpSync = true; refreshAllOpenPrices(true); }
+        } else if (data.status === 'unauthorized') {
+          showToast('Session expired — please login again.');
+          logout();
         } else {
-          setSyncBadge('err', 'Sync Error');
-          if (manual) showToast('Sheet Error: ' + (data.message || 'Unknown'));
+          setSyncBadge('err', 'Script Error');
+          if (manual) showToast('Script Error: ' + (data.message || 'Unknown server error'));
         }
       } catch (e) {
-        setSyncBadge('warn', 'Offline/Cached');
-        if (manual) showToast('Connection Failed: ' + (e && e.name === 'AbortError' ? 'Timeout' : (e && e.message ? e.message : 'Check Apps Script Anyone access')));
+        if (!currentSession) return;
+        const isTimeout = e && e.name === 'AbortError';
+        setSyncBadge('warn', outboxQueue.length > 0 ? `Pending (${outboxQueue.length})` : 'Offline/Cached');
+        if (manual) showToast(isTimeout ? 'Network Timeout (25s) — Offline' : 'Offline — cannot reach Google Sheet');
+      } finally {
+        isSyncing = false;
       }
     }
 
-    async function syncToGoogleSheet(payload) {
-      if (!GOOGLE_SCRIPT_URL) return false;
-      payload.token = SECRET_TOKEN;
-      try {
-        const resp = await fetch(GOOGLE_SCRIPT_URL, {
-          method: "POST",
-          redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        });
-        const data = await resp.json();
-        if (data && (data.status === "success" || data.status === "duplicate")) {
-          setSyncBadge('ok', 'Synced');
-          return true;
-        }
-        setSyncBadge('err', 'Sync Error');
-        showToast("Sheet Error: " + (data && data.message ? data.message : "Unknown"));
-        return false;
-      } catch (err) {
-        try {
-          await fetch(GOOGLE_SCRIPT_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload)
-          });
-          return true;
-        } catch (e2) {
-          setSyncBadge('err', 'Sync Pending');
-          showToast("Sheet sync failed — saved locally.");
-          return false;
-        }
-      }
-    }
-
-    function getCurrentWeekRange() {
+    function getWeekRange(offsetWeeks = 0) {
       const now = new Date();
       const currentDay = now.getDay();
       const distanceToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
       const monday = new Date(now);
-      monday.setDate(now.getDate() + distanceToMonday);
+      monday.setDate(now.getDate() + distanceToMonday + (offsetWeeks * 7));
       monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
 
       const friday = new Date(monday);
       friday.setDate(monday.getDate() + 4);
-      friday.setHours(23, 59, 59, 999);
-
       const formatDate = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-      return { start: monday, end: friday, label: `${formatDate(monday)} to ${formatDate(friday)}` };
+      return { start: monday, end: sunday, label: `${formatDate(monday)} to ${formatDate(friday)}`, isAll: false };
     }
 
-    const currentWeek = getCurrentWeekRange();
+    function getSelectedBillWeek() {
+      const el = document.getElementById('billWeekSelector');
+      const val = el ? el.value : '0';
+      if (val === 'ALL') return { start: null, end: null, label: 'All History', isAll: true };
+      return getWeekRange(parseInt(val, 10) || 0);
+    }
+
+    const NSE_HOLIDAYS = new Set([
+      '2025-02-26','2025-03-14','2025-03-31','2025-04-10','2025-04-14','2025-04-18','2025-05-01',
+      '2025-08-15','2025-08-27','2025-10-02','2025-10-21','2025-10-22','2025-11-05','2025-12-25',
+      '2026-01-26','2026-03-03','2026-03-26','2026-03-31','2026-04-03','2026-04-14','2026-05-01',
+      '2026-05-28','2026-06-26','2026-09-14','2026-10-02','2026-10-20','2026-11-10','2026-11-24','2026-12-25',
+      '2027-01-26','2027-03-22','2027-03-26','2027-04-14','2027-04-15','2027-08-15','2027-10-02','2027-10-29','2027-12-25'
+    ]);
+
+    function fmtIsoYmd(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
 
     function getLastTuesdayOfMonth(year, month) {
       const lastDay = new Date(year, month + 1, 0);
       let day = lastDay.getDate();
       while (new Date(year, month, day).getDay() !== 2) day--;
-      return new Date(year, month, day, 23, 59, 59, 999);
+      const d = new Date(year, month, day, 15, 30, 0, 0);
+      while (d.getDay() === 0 || d.getDay() === 6 || NSE_HOLIDAYS.has(fmtIsoYmd(d))) {
+        d.setDate(d.getDate() - 1);
+      }
+      d.setHours(15, 30, 0, 0);
+      return d;
     }
 
-    // Keeps Current Expiry active until Tuesday expiry day ends (23:59:59), so both Cur & Next are available for rollover
     function getNseExpiry(offsetMonths = 0) {
       const now = new Date();
       let baseYear = now.getFullYear();
@@ -1196,7 +1394,8 @@
       const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
       return {
         formatted: `${day}-${monthNames[targetMonth]}-${targetYear}`,
-        monthCode: `${monthNames[targetMonth]}-${targetYear}`
+        monthCode: `${monthNames[targetMonth]}-${targetYear}`,
+        cutoffMs: expDate.getTime()
       };
     }
 
@@ -1305,7 +1504,7 @@
       { name: "SUZLON", lot: 8400, price: 65.0 }, { name: "SYNGENE", lot: 1000, price: 860.0 },
       { name: "TATACHEM", lot: 550, price: 1040.0 }, { name: "TATACOMM", lot: 500, price: 1950.0 },
       { name: "TATACONSUM", lot: 900, price: 1120.0 }, { name: "TATAELXSI", lot: 100, price: 7450.0 },
-      { name: "TATAMOTORS", lot: 700, price: 890.0 }, { name: "TATAPOWER", lot: 1500, price: 420.0 },
+      { name: "TMPV", lot: 700, price: 0 }, { name: "TATAPOWER", lot: 1500, price: 420.0 },
       { name: "TATASTEEL", lot: 550, price: 168.2 }, { name: "TCS", lot: 175, price: 4120.0 },
       { name: "TECHM", lot: 600, price: 1680.0 }, { name: "TIINDIA", lot: 125, price: 4100.0 },
       { name: "TITAN", lot: 175, price: 3450.0 }, { name: "TORNTPHARM", lot: 250, price: 3250.0 },
@@ -1316,36 +1515,79 @@
       { name: "VBL", lot: 625, price: 590.0 }, { name: "VEDL", lot: 1150, price: 470.0 },
       { name: "VMM", lot: 3000, price: 110.0 }, { name: "VOLTAS", lot: 350, price: 1720.0 },
       { name: "WIPRO", lot: 1500, price: 540.0 }, { name: "YESBANK", lot: 25000, price: 21.0 },
-      { name: "ZOMATO", lot: 2425, price: 260.0 }, { name: "ZYDUSLIFE", lot: 900, price: 1050.0 }
+      { name: "ETERNAL", lot: 2425, price: 0 }, { name: "ZYDUSLIFE", lot: 900, price: 1050.0 }
     ].sort((a, b) => a.name.localeCompare(b.name));
     let customScripts = [];
     let livePrices = {};
     let contractPrices = {};
+    let priceSources = {};
+    let contractPriceMeta = {};
     try { contractPrices = JSON.parse(safeGetLS('app_contract_prices_v1', '{}')) || {}; } catch { contractPrices = {}; }
+    try { contractPriceMeta = JSON.parse(safeGetLS('app_contract_price_meta_v1', '{}')) || {}; } catch { contractPriceMeta = {}; }
     try { customScripts = JSON.parse(safeGetLS('app_custom_scripts_v1', '[]')) || []; } catch { customScripts = []; }
     try { livePrices = JSON.parse(safeGetLS('app_live_prices_v1', '{}')) || {}; } catch { livePrices = {}; }
 
-    function saveLivePrice(sym, price, contract = '') {
+    function isStalePrice(updatedAtMs) {
+      const ms = Number(updatedAtMs) || 0;
+      return ms > 0 && (Date.now() - ms) > 86400000;
+    }
+
+    function formatPriceAge(updatedAtMs) {
+      const ms = Number(updatedAtMs) || 0;
+      if (!(ms > 0)) return '';
+      const diffSec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+      if (diffSec < 60) return 'now';
+      if (diffSec < 3600) return Math.floor(diffSec / 60) + 'm';
+      if (diffSec < 86400) return Math.floor(diffSec / 3600) + 'h';
+      return Math.floor(diffSec / 86400) + 'd';
+    }
+
+    function renderCmpBadge(info) {
+      if (!info || info.missing) return '';
+      const parts = [];
+      if (info.source === 'CASH_FALLBACK') parts.push('<span class="amber" style="font-size:9px;">(Cash)</span>');
+      else if (info.source === 'NSE_FUT') parts.push('<span class="green" style="font-size:9px;">(FUT)</span>');
+      else if (info.source === 'MANUAL_FUT') parts.push('<span style="color:var(--accent); font-size:9px;">(Man)</span>');
+      else if (info.source === 'SHEET_FUT') parts.push('<span style="color:var(--muted); font-size:9px;">(Sheet)</span>');
+      const age = formatPriceAge(info.updatedAtMs);
+      if (age) parts.push(`<span style="color:var(--muted); font-size:9px;">${age}</span>`);
+      if (info.isStale) parts.push('<span class="red" style="font-size:9px; font-weight:700;">STALE</span>');
+      return parts.join(' ');
+    }
+
+    function saveLivePrice(sym, price, contract = '', source = '', updatedAtMs = 0) {
       const p = Number(price);
       if (!(p > 0)) return;
+      const ts = Number(updatedAtMs) > 0 ? Number(updatedAtMs) : Date.now();
       if (contract) {
-        contractPrices[String(contract).toUpperCase()] = p;
+        const k = String(contract).toUpperCase();
+        const src = source || priceSources[k] || 'MANUAL_FUT';
+        contractPrices[k] = p;
+        priceSources[k] = src;
+        contractPriceMeta[k] = { price: p, source: src, updatedAtMs: ts };
         safeSetLS('app_contract_prices_v1', JSON.stringify(contractPrices));
+        safeSetLS('app_contract_price_meta_v1', JSON.stringify(contractPriceMeta));
       }
       if (sym) {
         livePrices[sym] = p;
         safeSetLS('app_live_prices_v1', JSON.stringify(livePrices));
         const s = stockMap.get(sym);
         if (s) s.price = p;
-        else stockMap.set(sym, { name: sym, lot: 1, price: p });
+        else stockMap.set(sym, { name: sym, lot: 1, price: p, prevLot: 0, lotChanged: false });
       }
     }
 
     function rebuildStockCatalog() {
-      const merged = new Map(fnoDatabase.map(s => [s.name, { ...s }]));
+      const merged = new Map(fnoDatabase.map(s => [s.name, { name: s.name, lot: s.lot, price: 0, prevLot: 0, lotChanged: false }]));
       customScripts.forEach(cs => {
         if (cs.status === 'DELETED') merged.delete(cs.name);
-        else merged.set(cs.name, { name: cs.name, lot: Number(cs.lot) || 1, price: Number(cs.price) || 100 });
+        else merged.set(cs.name, {
+          name: cs.name,
+          lot: Number(cs.lot) || 1,
+          price: Number(cs.price) || 0,
+          prevLot: Number(cs.prevLot) || 0,
+          lotChanged: Boolean(cs.lotChanged)
+        });
       });
       for (const sym in livePrices) {
         if (merged.has(sym) && Number(livePrices[sym]) > 0) {
@@ -1364,16 +1606,25 @@
       const contract = explicitContract || `${sym} ${mCode} FUT`;
       try {
         const pCtrl = new AbortController();
-        const pTid = setTimeout(() => pCtrl.abort(), 10000);
-        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&mode=live_price&symbol=${encodeURIComponent(sym)}&monthCode=${encodeURIComponent(mCode)}&contract=${encodeURIComponent(contract)}`, { signal: pCtrl.signal });
+        const pTid = setTimeout(() => pCtrl.abort(), 15000);
+        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(sessionToken)}&mode=live_price&symbol=${encodeURIComponent(sym)}&monthCode=${encodeURIComponent(mCode)}&contract=${encodeURIComponent(contract)}`, { signal: pCtrl.signal });
         clearTimeout(pTid);
         const data = await resp.json();
         if (data.status === "success" && data.price > 0) {
-          saveLivePrice(sym, data.price, contract);
+          const src = data.source || 'CASH_FALLBACK';
+          const tsMs = Number(data.updatedAtMs) > 0 ? Number(data.updatedAtMs) : Date.now();
+          saveLivePrice(sym, data.price, contract, src, tsMs);
           document.getElementById(targetInputId).value = Number(data.price).toFixed(2);
           renderAll();
-          const srcTag = data.source === 'NSE_FUT' ? 'NSE FUT' : data.source === 'SHEET_FUT' ? 'Sheet FUT' : 'Cash Est.';
-          showToast(`${contract} (${srcTag}): ₹${Number(data.price).toFixed(2)}`);
+          const tagEl = document.getElementById('priceSourceTag');
+          if (tagEl && targetInputId === 'priceInput') {
+            tagEl.innerHTML = renderCmpBadge({ price: Number(data.price), source: src, updatedAtMs: tsMs, isStale: isStalePrice(tsMs), missing: false });
+          }
+          if (src === 'CASH_FALLBACK') {
+            showToast(`${contract}: NSE Futures unavailable — showing Cash Price ₹${Number(data.price).toFixed(2)}`);
+          } else {
+            showToast(`${contract} (${src === 'NSE_FUT' ? 'NSE FUT' : 'Sheet FUT'}): ₹${Number(data.price).toFixed(2)}`);
+          }
         } else {
           showToast(`Live rate unavailable for ${contract}`);
         }
@@ -1384,36 +1635,44 @@
       }
     }
 
-
     async function refreshAllOpenPrices(silent = false) {
       if (!GOOGLE_SCRIPT_URL) return;
-      const openContracts = new Set();
+      // Only request CMP for contracts with non-zero net open position
+      const netQtyMap = {};
       getVisibleTrades().forEach(t => {
-        if (t.contract) openContracts.add(t.contract.toUpperCase());
+        if (!t.contract) return;
+        const k = t.contract.toUpperCase();
+        netQtyMap[k] = (netQtyMap[k] || 0) + (t.action === 'BUY' ? (Number(t.qty) || 0) : -(Number(t.qty) || 0));
       });
-      const contractsArr = Array.from(openContracts);
+      const contractsArr = Object.keys(netQtyMap).filter(k => netQtyMap[k] !== 0);
       if (contractsArr.length === 0) {
-        if (!silent) showToast("No open trades to refresh.");
+        if (!silent) showToast("No net-open contracts to refresh.");
         return;
       }
-      if (!silent) showToast("Fetching Futures CMP for " + contractsArr.length + " contract(s)...");
+      if (!silent) showToast("Fetching Futures CMP for " + contractsArr.length + " open contract(s)...");
       try {
-        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&mode=batch_prices&contracts=${encodeURIComponent(contractsArr.join(','))}`);
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 25000);
+        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?token=${encodeURIComponent(sessionToken)}&mode=batch_prices&contracts=${encodeURIComponent(contractsArr.join(','))}`, { signal: ctrl.signal });
+        clearTimeout(tid);
         const data = await resp.json();
         if (data.status === "success" && data.prices) {
           let updated = 0;
           for (const cKey in data.prices) {
             const p = Number(data.prices[cKey]);
             if (p > 0) {
-              saveLivePrice(extractStockSymbol(cKey), p, cKey);
+              const src = (data.sources && data.sources[cKey]) || 'CASH_FALLBACK';
+              const tsMs = (data.timestamps && Number(data.timestamps[cKey]) > 0) ? Number(data.timestamps[cKey]) : Date.now();
+              saveLivePrice(extractStockSymbol(cKey), p, cKey, src, tsMs);
               updated++;
             }
           }
           renderAll();
-          if (!silent) showToast(`Updated Futures CMP for ${updated} contract(s).`);
+          const hasCash = contractsArr.some(k => priceSources[k] === 'CASH_FALLBACK');
+          if (!silent) showToast(hasCash ? `Updated ${updated} CMP (some using Cash price fallback!)` : `Updated Futures CMP for ${updated} open contract(s).`);
         }
-      } catch {
-        if (!silent) showToast("Offline — could not refresh CMP.");
+      } catch (e) {
+        if (!silent) showToast(e && e.name === 'AbortError' ? "CMP refresh timed out (25s)." : "Offline — could not refresh CMP.");
       }
     }
 
@@ -1423,12 +1682,27 @@
       fetchLivePriceForSymbol(sym, 'newScriptPrice', false);
     }
 
-    function getCmpForContract(contract, fallbackRate) {
+    // Never fall back to hardcoded static fnoDatabase price; return missing:true when unavailable
+    function getCmpInfo(contract) {
       const cKey = String(contract || '').trim().toUpperCase();
-      if (contractPrices[cKey] > 0) return Number(contractPrices[cKey]);
-      const sym = extractStockSymbol(contract);
-      const stock = stockMap.get(sym);
-      return (stock && stock.price > 0) ? Number(stock.price) : Number(fallbackRate || 0);
+      const meta = contractPriceMeta[cKey];
+      if (meta && Number(meta.price) > 0) {
+        const src = meta.source || priceSources[cKey] || 'SHEET_FUT';
+        const ts = Number(meta.updatedAtMs) || 0;
+        return {
+          price: Number(meta.price),
+          source: src,
+          updatedAtMs: ts,
+          isStale: isStalePrice(ts),
+          isCash: src === 'CASH_FALLBACK',
+          missing: false
+        };
+      }
+      if (contractPrices[cKey] > 0) {
+        const src = priceSources[cKey] || 'SHEET_FUT';
+        return { price: Number(contractPrices[cKey]), source: src, updatedAtMs: 0, isStale: false, isCash: src === 'CASH_FALLBACK', missing: false };
+      }
+      return { price: null, source: 'MISSING', updatedAtMs: 0, isStale: false, isCash: false, missing: true };
     }
 
     function fetchLivePriceForCurrent() {
@@ -1459,7 +1733,7 @@
 
       document.getElementById('expCurrent').innerText = `${currentExp.formatted} (Cur)`;
       document.getElementById('expNext').innerText = `${nextExp.formatted} (Next)`;
-      document.getElementById('weekRangeDisplay').innerText = `Period: ${currentWeek.label} (+ Carry-Fwd)`;
+      document.getElementById('weekRangeDisplay').innerText = `Period: ${getSelectedBillWeek().label} (+ Carry-Fwd)`;
 
       const isAdmin = currentSession.role === 'admin';
       if (!isAdmin) {
@@ -1477,6 +1751,7 @@
         document.getElementById('retentionAlertBanner').style.display = 'none';
         document.getElementById('mtmCard').style.display = 'none';
         document.getElementById('subBrokerSummaryCard').style.display = 'none';
+        document.getElementById('newClientRate').readOnly = true;
         document.getElementById('manageTitle').innerText = `Add / Edit Client (${currentSession.branchName})`;
       } else {
         document.getElementById('branchBadge').innerText = `HO: ${currentSession.branchName.toUpperCase()}`;
@@ -1491,6 +1766,7 @@
         document.getElementById('dataRetentionCard').style.display = 'block';
         document.getElementById('mtmCard').style.display = 'block';
         document.getElementById('subBrokerSummaryCard').style.display = 'block';
+        document.getElementById('newClientRate').readOnly = false;
         document.getElementById('manageTitle').innerText = "Add / Edit Client";
       }
 
@@ -1500,7 +1776,7 @@
       renderAll();
 
       clearInterval(syncIntervalId);
-      syncIntervalId = setInterval(syncFromGoogleSheet, 20000);
+      syncIntervalId = setInterval(syncFromGoogleSheet, 60000);
     }
 
     function forceSwitchToDefaultTab() {
@@ -1586,13 +1862,22 @@
     function updateContractDisplay() {
       const contract = buildContractString();
       document.getElementById('stockSearch').value = contract;
-      document.getElementById('priceLabel').innerText = `Price (${contract})`;
+      document.getElementById('priceLabelText').innerText = `Price (${contract})`;
 
       const stock = stockMap.get(currentRawStock);
       if (stock) {
-        document.getElementById('lotHint').innerText = `Ref Lot: ${stock.lot} (Any qty allowed)`;
-        const cPrice = contractPrices[contract.toUpperCase()] || stock.price;
-        document.getElementById('priceInput').value = Number(cPrice).toFixed(2);
+        const lotWarn = stock.lotChanged ? ` ⚠️ Lot changed: ${stock.prevLot}→${stock.lot}` : '';
+        document.getElementById('lotHint').innerText = `Ref Lot: ${stock.lot} (Any qty allowed)${lotWarn}`;
+      }
+      const info = getCmpInfo(contract);
+      const pEl = document.getElementById('priceInput');
+      const tagEl = document.getElementById('priceSourceTag');
+      if (!info.missing) {
+        pEl.value = Number(info.price).toFixed(2);
+        if (tagEl) tagEl.innerHTML = renderCmpBadge(info);
+      } else {
+        pEl.value = '';
+        if (tagEl) tagEl.innerHTML = '<span style="color:var(--muted); font-size:10px;">(No CMP)</span>';
       }
     }
 
@@ -1634,8 +1919,8 @@
       if (matched.length > 0) {
         resultsDiv.innerHTML = matched.map(s => `
           <div class="search-item" data-stock="${escapeHtml(s.name)}" data-lot="${s.lot}">
-            <span><b>${escapeHtml(s.name)} ${activeCode} FUT</b></span>
-            <small style="color:var(--muted)">₹${s.price} | Lot: ${s.lot}</small>
+            <span><b>${escapeHtml(s.name)} ${activeCode} FUT</b>${s.lotChanged ? ' <span class="amber" style="font-size:10px;">(Lot!)</span>' : ''}</span>
+            <small style="color:var(--muted)">${s.price > 0 ? '₹' + s.price + ' | ' : ''}Lot: ${s.lot}</small>
           </div>
         `).join('');
         resultsDiv.style.display = "block";
@@ -1655,6 +1940,10 @@
       updateContractDisplay();
       document.getElementById('qtyInput').value = lot;
       document.getElementById('searchResults').style.display = "none";
+      const s = stockMap.get(name);
+      if (s && s.lotChanged) {
+        showToast(`⚠️ ${name} lot size changed: ${s.prevLot} → ${s.lot}`);
+      }
       fetchLivePriceForSymbol(name, 'priceInput', true);
     }
 
@@ -1669,9 +1958,11 @@
       return m ? m[1] : String(ts || '-').slice(0, 10);
     }
 
-    function computeClientFIFO(clientId) {
-      const clientTrades = trades
-        .filter(t => t.clientId === clientId && t.status !== 'CANCELLED')
+    function computeClientFIFO(clientId, weekRange = null) {
+      const rawClientTrades = tradesByClientMap.size > 0
+        ? (tradesByClientMap.get(clientId) || [])
+        : trades.filter(t => t.clientId === clientId && t.status !== 'CANCELLED');
+      const clientTrades = rawClientTrades
         .slice()
         .sort((a, b) => parseTradeDate(a) - parseTradeDate(b));
 
@@ -1680,6 +1971,8 @@
       let unrealizedMtm = 0;
       let netOpenLong = 0;
       let netOpenShort = 0;
+      let hasMissingCmp = false;
+      let hasProvisionalCmp = false;
       const matchedPairs = [];
       const openPositions = [];
 
@@ -1690,71 +1983,66 @@
 
       for (const contract in contractQueues) {
         const queue = contractQueues[contract];
-        const buys = queue.filter(x => x.action === 'BUY');
-        const sells = queue.filter(x => x.action === 'SELL');
+        const openQueue = [];
 
-        let bIdx = 0, sIdx = 0;
-        while (bIdx < buys.length && sIdx < sells.length) {
-          const b = buys[bIdx];
-          const s = sells[sIdx];
-          const matchQty = Math.min(b.remainingQty, s.remainingQty);
-          const pairPnl = (s.netRate - b.netRate) * matchQty;
+        queue.forEach(t => {
+          let qtyLeft = t.remainingQty;
+          while (qtyLeft > 0 && openQueue.length > 0 && openQueue[0].action !== t.action) {
+            const head = openQueue[0];
+            const matchQty = Math.min(head.remainingQty, qtyLeft);
+            const buyRate = head.action === 'BUY' ? Number(head.netRate) : Number(t.netRate);
+            const sellRate = head.action === 'SELL' ? Number(head.netRate) : Number(t.netRate);
+            const pairPnl = (sellRate - buyRate) * matchQty;
 
-          realizedPnL += pairPnl;
+            realizedPnL += pairPnl;
 
-          const bDate = shortDateOnly(b.timestamp);
-          const sDate = shortDateOnly(s.timestamp);
-          const entryFirst = parseTradeDate(b) <= parseTradeDate(s);
-          const entryDate = entryFirst ? bDate : sDate;
-          const exitDate = entryFirst ? sDate : bDate;
-          const isIntraday = (entryDate !== '-' && entryDate === exitDate);
+            const entryDate = shortDateOnly(head.timestamp);
+            const exitDate = shortDateOnly(t.timestamp);
+            const isIntraday = (entryDate !== '-' && entryDate === exitDate);
 
-          matchedPairs.push({
-            contract,
-            entryDate,
-            exitDate,
-            isIntraday,
-            qty: matchQty,
-            buyRate: Number(b.netRate),
-            sellRate: Number(s.netRate),
-            pnl: pairPnl
-          });
+            matchedPairs.push({
+              contract,
+              entryDate,
+              exitDate,
+              exitMs: parseTradeDate(t),
+              isIntraday,
+              qty: matchQty,
+              buyRate,
+              sellRate,
+              pnl: pairPnl
+            });
 
-          b.remainingQty -= matchQty;
-          s.remainingQty -= matchQty;
+            head.remainingQty -= matchQty;
+            qtyLeft -= matchQty;
+            if (head.remainingQty === 0) openQueue.shift();
+          }
 
-          if (b.remainingQty === 0) bIdx++;
-          if (s.remainingQty === 0) sIdx++;
-        }
-
-        buys.slice(bIdx).forEach(b => {
-          netOpenLong += b.remainingQty;
-          const cmp = getCmpForContract(contract, b.netRate);
-          const mtm = (cmp - b.netRate) * b.remainingQty;
-          unrealizedMtm += mtm;
-          openPositions.push({
-            contract,
-            entryDate: shortDateOnly(b.timestamp),
-            side: 'BUY',
-            qty: b.remainingQty,
-            openRate: Number(b.netRate),
-            cmp,
-            mtm
-          });
+          if (qtyLeft > 0) {
+            openQueue.push({ ...t, remainingQty: qtyLeft });
+          }
         });
-        sells.slice(sIdx).forEach(s => {
-          netOpenShort += s.remainingQty;
-          const cmp = getCmpForContract(contract, s.netRate);
-          const mtm = (s.netRate - cmp) * s.remainingQty;
-          unrealizedMtm += mtm;
+
+        openQueue.forEach(o => {
+          const cmpInfo = getCmpInfo(contract);
+          const cmp = cmpInfo.missing ? null : cmpInfo.price;
+          const mtm = cmpInfo.missing ? null : (o.action === 'BUY' ? (cmp - o.netRate) * o.remainingQty : (o.netRate - cmp) * o.remainingQty);
+          if (o.action === 'BUY') netOpenLong += o.remainingQty;
+          else netOpenShort += o.remainingQty;
+          if (mtm !== null) unrealizedMtm += mtm;
+          if (cmpInfo.missing) hasMissingCmp = true;
+          if (cmpInfo.missing || cmpInfo.isCash || cmpInfo.isStale) hasProvisionalCmp = true;
           openPositions.push({
             contract,
-            entryDate: shortDateOnly(s.timestamp),
-            side: 'SELL',
-            qty: s.remainingQty,
-            openRate: Number(s.netRate),
+            entryDate: shortDateOnly(o.timestamp),
+            side: o.action,
+            qty: o.remainingQty,
+            openRate: Number(o.netRate),
             cmp,
-            mtm
+            mtm,
+            cmpMissing: cmpInfo.missing,
+            cmpCash: cmpInfo.isCash,
+            cmpStale: cmpInfo.isStale,
+            cmpSource: cmpInfo.source
           });
         });
       }
@@ -1764,7 +2052,7 @@
       // If client made +5000 profit (realizedPnL = +5000), broker owes client +5000.
       // When broker PAYS 5000 to client (debit = 5000), client's net receivable drops by 5000 -> becomes 0!
       // When client PAYS 5000 to broker (credit = 5000), client's negative payable (-5000) increases by +5000 -> becomes 0!
-      const clientLedger = ledger.filter(l => l.clientId === clientId);
+      const clientLedger = ledgerByClientMap.size > 0 ? (ledgerByClientMap.get(clientId) || []) : ledger.filter(l => l.clientId === clientId);
       let cashPaidToClient = 0;
       let cashReceivedFromClient = 0;
       clientLedger.forEach(l => {
@@ -1772,12 +2060,89 @@
         cashReceivedFromClient += Number(l.credit) || 0;
       });
       const cashAdjustment = cashReceivedFromClient - cashPaidToClient;
-      const netBalance = realizedPnL + cashAdjustment;
+      const closingBalance = realizedPnL + cashAdjustment;
 
-      return { realizedPnL, unrealizedMtm, cashPaidToClient, cashReceivedFromClient, cashAdjustment, netBalance, netOpenLong, netOpenShort, openLots: netOpenLong + netOpenShort, matchedPairs, openPositions };
+      let openingBalance = 0;
+      let weeklyRealizedPnL = realizedPnL;
+      let weeklyCashPaid = cashPaidToClient;
+      let weeklyCashReceived = cashReceivedFromClient;
+      let scopedMatchedPairs = matchedPairs;
+
+      if (weekRange && !weekRange.isAll && weekRange.start && weekRange.end) {
+        const wStart = weekRange.start.getTime();
+        const wEnd = weekRange.end.getTime();
+        let preRealized = 0;
+        let inWeekRealized = 0;
+        scopedMatchedPairs = [];
+        matchedPairs.forEach(p => {
+          if (p.exitMs > 0 && p.exitMs < wStart) {
+            preRealized += p.pnl;
+          } else if (p.exitMs >= wStart && p.exitMs <= wEnd) {
+            inWeekRealized += p.pnl;
+            scopedMatchedPairs.push(p);
+          } else if (p.exitMs === 0) {
+            inWeekRealized += p.pnl;
+            scopedMatchedPairs.push(p);
+          }
+        });
+        let preCash = 0;
+        weeklyCashPaid = 0;
+        weeklyCashReceived = 0;
+        clientLedger.forEach(l => {
+          const lMs = parseLedgerDateMs(l);
+          const deb = Number(l.debit) || 0;
+          const cred = Number(l.credit) || 0;
+          if (lMs > 0 && lMs < wStart) {
+            preCash += (cred - deb);
+          } else if ((lMs >= wStart && lMs <= wEnd) || lMs === 0) {
+            weeklyCashPaid += deb;
+            weeklyCashReceived += cred;
+          }
+        });
+        openingBalance = preRealized + preCash;
+        weeklyRealizedPnL = inWeekRealized;
+      }
+
+      const netBalance = closingBalance;
+      return {
+        realizedPnL: weeklyRealizedPnL,
+        allTimeRealizedPnL: realizedPnL,
+        openingBalance,
+        closingBalance,
+        unrealizedMtm,
+        hasMissingCmp,
+        hasProvisionalCmp,
+        cashPaidToClient: weeklyCashPaid,
+        cashReceivedFromClient: weeklyCashReceived,
+        allTimeCashPaid: cashPaidToClient,
+        allTimeCashReceived: cashReceivedFromClient,
+        cashAdjustment,
+        netBalance,
+        netOpenLong,
+        netOpenShort,
+        openLots: netOpenLong + netOpenShort,
+        matchedPairs: scopedMatchedPairs,
+        allMatchedPairs: matchedPairs,
+        openPositions
+      };
+    }
+
+    function rebuildClientMaps() {
+      tradesByClientMap = new Map();
+      trades.forEach(t => {
+        if (t.status === 'CANCELLED') return;
+        if (!tradesByClientMap.has(t.clientId)) tradesByClientMap.set(t.clientId, []);
+        tradesByClientMap.get(t.clientId).push(t);
+      });
+      ledgerByClientMap = new Map();
+      ledger.forEach(l => {
+        if (!ledgerByClientMap.has(l.clientId)) ledgerByClientMap.set(l.clientId, []);
+        ledgerByClientMap.get(l.clientId).push(l);
+      });
     }
 
     function renderAll() {
+      rebuildClientMaps();
       renderBranchDropdowns();
       renderClientsDropdown();
       renderTrades();
@@ -1785,6 +2150,7 @@
         renderMasterPool();
         renderBranchesList();
         renderMtmContractOptions();
+        renderExpiredContractOptions();
         renderScriptsManager();
         renderSubBrokerSummary();
         checkSixMonthRetention();
@@ -1902,7 +2268,7 @@
         debit: entry.debit,
         credit: entry.credit,
         remarks: entry.remarks
-      });
+      }, 'ledger', entry);
 
       document.getElementById('ledgerAmount').value = '';
       document.getElementById('ledgerRemarks').value = '';
@@ -1937,22 +2303,70 @@
       const contract = document.getElementById('mtmContractSelect').value;
       if (!contract) return;
       const sym = extractStockSymbol(contract);
-      const cPrice = getCmpForContract(contract, 0);
-      if (cPrice > 0) document.getElementById('mtmClosePrice').value = cPrice.toFixed(2);
+      const info = getCmpInfo(contract);
+      document.getElementById('mtmClosePrice').value = !info.missing ? info.price.toFixed(2) : '';
     }
 
-    // Friday Close MTM Settlement: squares off at closePrice (0% brokerage) and re-opens carry-forward at closePrice (0% brokerage)
-    function settleFridayMTM() {
+    function askConfirmModal(msg, title = 'Confirm Action') {
+      return new Promise(resolve => {
+        const m = document.getElementById('appConfirmModal');
+        document.getElementById('appConfirmTitle').innerText = title;
+        document.getElementById('appConfirmMsg').innerText = msg;
+        m.style.display = 'flex';
+        const cleanup = (val) => {
+          m.style.display = 'none';
+          resolve(val);
+        };
+        document.getElementById('appConfirmOkBtn').onclick = () => cleanup(true);
+        document.getElementById('appConfirmCancelBtn').onclick = () => cleanup(false);
+      });
+    }
+
+    function renderExpiredContractOptions() {
+      const sel = document.getElementById('expiredContractSelect');
+      if (!sel) return;
+      const openContracts = new Set();
+      getVisibleClients().forEach(c => {
+        const cTrades = trades.filter(t => t.clientId === c.id && t.status !== 'CANCELLED');
+        const map = {};
+        cTrades.forEach(t => {
+          map[t.contract] = (map[t.contract] || 0) + (t.action === 'BUY' ? t.qty : -t.qty);
+        });
+        for (const k in map) {
+          if (map[k] !== 0) openContracts.add(k);
+        }
+      });
+      const arr = Array.from(openContracts);
+      if (arr.length === 0) {
+        sel.innerHTML = `<option value="">-- No Open Contracts --</option>`;
+        document.getElementById('expiredSettlePrice').value = '';
+        return;
+      }
+      sel.innerHTML = arr.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      autoFillExpiredPrice();
+    }
+
+    function autoFillExpiredPrice() {
+      const contract = document.getElementById('expiredContractSelect').value;
+      if (!contract) return;
+      const info = getCmpInfo(contract);
+      document.getElementById('expiredSettlePrice').value = !info.missing ? info.price.toFixed(2) : '';
+    }
+
+    function fetchLivePriceForExpired() {
+      const contract = document.getElementById('expiredContractSelect').value;
+      if (!contract) return;
+      fetchLivePriceForSymbol(extractStockSymbol(contract), 'expiredSettlePrice', false, contract);
+    }
+
+    async function settleExpiredContract() {
       if (!currentSession || currentSession.role !== 'admin') return;
-      const contract = document.getElementById('mtmContractSelect').value;
-      const closePrice = parseFloat(document.getElementById('mtmClosePrice').value) || 0;
-      if (!contract || closePrice <= 0) return showToast("Select open contract and valid Friday Close Price!");
+      const contract = document.getElementById('expiredContractSelect').value;
+      const settlePrice = parseFloat(document.getElementById('expiredSettlePrice').value) || 0;
+      if (!contract || settlePrice <= 0) return showToast("Select contract and valid Final Settlement Price!");
 
-      const now = new Date();
-      const tsClose = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} 15:30:00`;
-      const tsOpen = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} 15:30:01`;
-      let settledCount = 0;
-
+      const targets = [];
+      let totalAbsQty = 0;
       clients.filter(c => c.active !== false).forEach(c => {
         const cTrades = trades.filter(t => t.clientId === c.id && t.contract === contract && t.status !== 'CANCELLED');
         let netQty = 0;
@@ -1961,14 +2375,116 @@
           netQty += (t.action === 'BUY' ? t.qty : -t.qty);
           if (t.expiry) expiry = t.expiry;
         });
-        if (netQty === 0) return;
+        if (netQty !== 0) {
+          targets.push({ client: c, netQty, expiry });
+          totalAbsQty += Math.abs(netQty);
+        }
+      });
+      if (targets.length === 0) return showToast("No open positions found for this contract!");
+      if (!(await askConfirmModal(`Settle Expired Contract ${contract} for ${targets.length} client(s) (Total Qty: ${totalAbsQty}) @ ₹${settlePrice.toFixed(2)}?`, "Settle Expired Contract"))) return;
 
-        const absQty = Math.abs(netQty);
-        const closeSide = netQty > 0 ? 'SELL' : 'BUY';
-        const reopenSide = netQty > 0 ? 'BUY' : 'SELL';
+      const now = new Date();
+      const tsStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${now.toLocaleTimeString('en-IN', { hour12: false })}`;
+      let synced = 0;
+
+      for (const item of targets) {
+        const c = item.client;
+        const absQty = Math.abs(item.netQty);
+        const closeSide = item.netQty > 0 ? 'SELL' : 'BUY';
+        const brokRate = parseRate(c.rate);
+        const brokFactor = settlePrice * (brokRate / 100);
+        const netRate = closeSide === 'BUY' ? (settlePrice + brokFactor) : (settlePrice - brokFactor);
+        const brokAmt = Number((brokFactor * absQty).toFixed(2));
+        const tr = {
+          id: generateShortId("TR_"),
+          clientId: c.id,
+          clientName: c.name,
+          branch: normalizeBranch(c.branch),
+          contract: contract,
+          action: closeSide,
+          qty: absQty,
+          basePrice: settlePrice,
+          netRate: Number(netRate.toFixed(2)),
+          timestamp: tsStr,
+          isoDate: now.toISOString(),
+          expiry: item.expiry,
+          status: "OPEN",
+          cancelReq: false,
+          tradeType: "EXPIRY_SETTLE",
+          brokerageRate: brokRate,
+          brokerageAmt: brokAmt
+        };
+        trades.push(tr);
+        const ok = await syncToGoogleSheet({
+          action: "add_trade", tradeType: "EXPIRY_SETTLE", id: tr.id, timestamp: tr.timestamp, branch: tr.branch,
+          clientId: tr.clientId, clientName: tr.clientName, contract: tr.contract,
+          side: tr.action, qty: tr.qty, basePrice: settlePrice, netRate: tr.netRate.toFixed(2), expiry: item.expiry
+        }, 'trade', tr);
+        if (ok) synced++;
+      }
+      saveLivePrice(extractStockSymbol(contract), settlePrice, contract, 'MANUAL_FUT', Date.now());
+      saveState();
+      renderAll();
+      showToast(`Expired Contract ${contract} settled for ${targets.length} client(s) (${synced} synced).`);
+    }
+
+    async function settleFridayMTM() {
+      if (!currentSession || currentSession.role !== 'admin') return;
+      const contract = document.getElementById('mtmContractSelect').value;
+      const closePrice = parseFloat(document.getElementById('mtmClosePrice').value) || 0;
+      if (!contract || closePrice <= 0) return showToast("Select open contract and valid Friday Close Price!");
+
+      const now = new Date();
+      const todayStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+      const alreadyRolledToday = trades.some(t =>
+        t.status !== 'CANCELLED' &&
+        t.contract === contract &&
+        t.tradeType === 'MTM_ROLL' &&
+        shortDateOnly(t.timestamp) === todayStr
+      );
+      if (alreadyRolledToday) {
+        return showToast(`Blocked: ${contract} was already MTM rolled today (${todayStr})!`);
+      }
+
+      const cmpInfo = getCmpInfo(contract);
+      const matchesExistingMeta = !cmpInfo.missing && Math.abs(closePrice - Number(cmpInfo.price)) < 0.01;
+      if (matchesExistingMeta && (cmpInfo.isCash || cmpInfo.isStale)) {
+        const warnReason = cmpInfo.isCash ? 'Yahoo Cash Price (CASH_FALLBACK)' : `Stale Price (${formatPriceAge(cmpInfo.updatedAtMs)})`;
+        if (!(await askConfirmModal(`⚠️ WARNING: Price ₹${closePrice.toFixed(2)} for ${contract} is ${warnReason}. Proceed with Friday MTM Roll?`, "Price Warning"))) return;
+      }
+
+      const targets = [];
+      let totalAbsQty = 0;
+      clients.filter(c => c.active !== false).forEach(c => {
+        const cTrades = trades.filter(t => t.clientId === c.id && t.contract === contract && t.status !== 'CANCELLED');
+        let netQty = 0;
+        let expiry = '';
+        cTrades.forEach(t => {
+          netQty += (t.action === 'BUY' ? t.qty : -t.qty);
+          if (t.expiry) expiry = t.expiry;
+        });
+        if (netQty !== 0) {
+          targets.push({ client: c, netQty, expiry });
+          totalAbsQty += Math.abs(netQty);
+        }
+      });
+
+      if (targets.length === 0) return showToast("No open positions found for this contract!");
+      if (!(await askConfirmModal(`Contract: ${contract}\nClients: ${targets.length}\nTotal Qty: ${totalAbsQty}\nRate: ₹${closePrice.toFixed(2)} (0% Brokerage)`, "Confirm Friday MTM Roll"))) return;
+
+      const tsClose = `${todayStr} ${now.toLocaleTimeString('en-IN', { hour12: false })}`;
+      const reopenTime = new Date(now.getTime() + 1000);
+      const tsOpen = `${todayStr} ${reopenTime.toLocaleTimeString('en-IN', { hour12: false })}`;
+      let syncedCount = 0;
+
+      for (const item of targets) {
+        const c = item.client;
+        const absQty = Math.abs(item.netQty);
+        const closeSide = item.netQty > 0 ? 'SELL' : 'BUY';
+        const reopenSide = item.netQty > 0 ? 'BUY' : 'SELL';
 
         const closeTrade = {
-          id: "TR_" + crypto.randomUUID().slice(0, 8),
+          id: generateShortId("TR_"),
           clientId: c.id,
           clientName: c.name,
           branch: normalizeBranch(c.branch),
@@ -1979,12 +2495,15 @@
           netRate: closePrice,
           timestamp: tsClose,
           isoDate: now.toISOString(),
-          expiry: expiry,
+          expiry: item.expiry,
           status: "OPEN",
-          cancelReq: false
+          cancelReq: false,
+          tradeType: "MTM_ROLL",
+          brokerageRate: 0,
+          brokerageAmt: 0
         };
         const reopenTrade = {
-          id: "TR_" + crypto.randomUUID().slice(0, 8),
+          id: generateShortId("TR_"),
           clientId: c.id,
           clientName: c.name,
           branch: normalizeBranch(c.branch),
@@ -1994,32 +2513,34 @@
           basePrice: closePrice,
           netRate: closePrice,
           timestamp: tsOpen,
-          isoDate: new Date(now.getTime() + 1000).toISOString(),
-          expiry: expiry,
+          isoDate: reopenTime.toISOString(),
+          expiry: item.expiry,
           status: "OPEN",
-          cancelReq: false
+          cancelReq: false,
+          tradeType: "MTM_ROLL",
+          brokerageRate: 0,
+          brokerageAmt: 0
         };
 
         trades.push(closeTrade, reopenTrade);
-        syncToGoogleSheet({
-          action: "add_trade", id: closeTrade.id, timestamp: closeTrade.timestamp, branch: closeTrade.branch,
+        const ok1 = await syncToGoogleSheet({
+          action: "add_trade", isMtmRoll: true, tradeType: "MTM_ROLL", id: closeTrade.id, timestamp: closeTrade.timestamp, branch: closeTrade.branch,
           clientId: closeTrade.clientId, clientName: closeTrade.clientName, contract: closeTrade.contract,
-          side: closeTrade.action, qty: closeTrade.qty, basePrice: closePrice, netRate: closePrice.toFixed(2), expiry: expiry
-        });
-        syncToGoogleSheet({
-          action: "add_trade", id: reopenTrade.id, timestamp: reopenTrade.timestamp, branch: reopenTrade.branch,
+          side: closeTrade.action, qty: closeTrade.qty, basePrice: closePrice, netRate: closePrice.toFixed(2), expiry: item.expiry
+        }, 'trade', closeTrade);
+        const ok2 = await syncToGoogleSheet({
+          action: "add_trade", isMtmRoll: true, tradeType: "MTM_ROLL", id: reopenTrade.id, timestamp: reopenTrade.timestamp, branch: reopenTrade.branch,
           clientId: reopenTrade.clientId, clientName: reopenTrade.clientName, contract: reopenTrade.contract,
-          side: reopenTrade.action, qty: reopenTrade.qty, basePrice: closePrice, netRate: closePrice.toFixed(2), expiry: expiry
-        });
-        settledCount++;
-      });
+          side: reopenTrade.action, qty: reopenTrade.qty, basePrice: closePrice, netRate: closePrice.toFixed(2), expiry: item.expiry
+        }, 'trade', reopenTrade);
+        if (ok1 && ok2) syncedCount++;
+      }
 
-      if (settledCount === 0) return showToast("No open positions found for this contract!");
-      saveLivePrice(extractStockSymbol(contract), closePrice, contract);
-      syncToGoogleSheet({ action: 'save_contract_rate', contract: contract, symbol: extractStockSymbol(contract), expiry: '', price: closePrice });
+      saveLivePrice(extractStockSymbol(contract), closePrice, contract, 'MANUAL_FUT', Date.now());
+      await syncToGoogleSheet({ action: 'save_contract_rate', contract: contract, symbol: extractStockSymbol(contract), expiry: '', price: closePrice });
       saveState();
       renderAll();
-      showToast(`Friday MTM settled for ${settledCount} client(s) @ ₹${closePrice.toFixed(2)} (0% Brok)!`);
+      showToast(`Friday MTM settled for ${targets.length} client(s) @ ₹${closePrice.toFixed(2)} (${syncedCount}/${targets.length} synced)!`);
     }
 
     function renderTrades() {
@@ -2048,24 +2569,33 @@
 
       const isAdmin = currentSession && currentSession.role === 'admin';
       let totalMtm = 0;
+      let missingCmpCount = 0;
 
       tbody.innerHTML = visibleTrades.map(t => {
-        const cmp = getCmpForContract(t.contract, t.netRate);
-        const mtm = t.action === 'BUY' ? (cmp - Number(t.netRate)) * t.qty : (Number(t.netRate) - cmp) * t.qty;
-        totalMtm += mtm;
-        const mtmHtml = `<span class="${mtm >= 0 ? 'green' : 'red'}">${mtm >= 0 ? '+₹' : '-₹'}${Math.abs(mtm).toFixed(0)}</span>`;
+        const cmpInfo = getCmpInfo(t.contract);
+        let mtmHtml = `<span style="color:var(--muted);">CMP નથી</span>`;
+        let cmpCellHtml = `<span class="red" style="font-weight:700;">CMP નથી</span> <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:2px;" data-act="set-cmp" data-contract="${escapeHtml(t.contract)}" data-cmp="">Set</button>`;
+        if (!cmpInfo.missing) {
+          const cmp = cmpInfo.price;
+          const mtm = t.action === 'BUY' ? (cmp - Number(t.netRate)) * t.qty : (Number(t.netRate) - cmp) * t.qty;
+          totalMtm += mtm;
+          mtmHtml = `<span class="${mtm >= 0 ? 'green' : 'red'}">${mtm >= 0 ? '+₹' : '-₹'}${Math.abs(mtm).toFixed(0)}</span>`;
+          cmpCellHtml = `₹${cmp.toFixed(2)} ${renderCmpBadge(cmpInfo)} <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:2px;" data-act="set-cmp" data-contract="${escapeHtml(t.contract)}" data-cmp="${cmp}">Set</button>`;
+        } else {
+          missingCmpCount++;
+        }
 
         const isPendingCancel = t.cancelReq || t.status === 'PENDING_CANCEL';
         const reasonNote = (isPendingCancel && t.cancelReason) ? `<span class="timestamp-text" style="color:#fde68a;">Reason: ${escapeHtml(t.cancelReason)}</span>` : '';
         let actionBtn = '';
         if (isAdmin) {
           actionBtn = isPendingCancel
-            ? `<button class="btn-edit" onclick="openEditTradeModal('${escapeHtml(t.id)}')">Edit</button><button class="btn-cancel" onclick="openDeleteModal('${escapeHtml(t.id)}')">Approve Del</button> <button class="btn-edit" onclick="rejectCancel('${escapeHtml(t.id)}')">Keep</button>`
-            : `<button class="btn-edit" onclick="openEditTradeModal('${escapeHtml(t.id)}')">Edit</button><button class="btn-cancel" onclick="openDeleteModal('${escapeHtml(t.id)}')">Delete</button>`;
+            ? `<button class="btn-edit" data-act="edit-trade" data-id="${escapeHtml(t.id)}">Edit</button><button class="btn-cancel" data-act="del-trade" data-id="${escapeHtml(t.id)}">Approve Del</button> <button class="btn-edit" data-act="keep-trade" data-id="${escapeHtml(t.id)}">Keep</button>`
+            : `<button class="btn-edit" data-act="edit-trade" data-id="${escapeHtml(t.id)}">Edit</button><button class="btn-cancel" data-act="del-trade" data-id="${escapeHtml(t.id)}">Delete</button>`;
         } else {
           actionBtn = isPendingCancel
             ? `<span class="amber" style="font-size:11px;">Delete Pending</span>`
-            : `<button class="btn-req" onclick="openReqCancelModal('${escapeHtml(t.id)}')">Request Delete</button>`;
+            : `<button class="btn-req" data-act="req-del" data-id="${escapeHtml(t.id)}">Request Delete</button>`;
         }
 
         return `<tr>
@@ -2074,7 +2604,7 @@
           <td class="${t.action==='BUY'?'green':'red'}">${escapeHtml(t.action)}</td>
           <td>${t.qty}</td>
           <td><b>₹${Number(t.netRate).toFixed(2)}</b></td>
-          <td>₹${cmp.toFixed(2)} <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:4px;" onclick="openSetCmpModal('${escapeHtml(t.contract)}', ${cmp})">Set</button></td>
+          <td>${cmpCellHtml}</td>
           <td>${mtmHtml}</td>
           <td>${actionBtn}</td>
         </tr>`;
@@ -2091,14 +2621,17 @@
         }
       }
       if (totalMtmEl) {
-        totalMtmEl.innerHTML = `(MTM: <span class="${totalMtm >= 0 ? 'green' : 'red'}">${totalMtm >= 0 ? '+₹' : '-₹'}${Math.abs(totalMtm).toFixed(0)}</span>)`;
+        const missNote = missingCmpCount > 0 ? ` <span class="amber" style="font-size:11px;">(Excl. ${missingCmpCount} w/o CMP)</span>` : '';
+        totalMtmEl.innerHTML = `(MTM: <span class="${totalMtm >= 0 ? 'green' : 'red'}">${totalMtm >= 0 ? '+₹' : '-₹'}${Math.abs(totalMtm).toFixed(0)}</span>${missNote})`;
       }
     }
 
     function renderMasterPool() {
       const tbody = document.getElementById('masterPoolBody');
-      const activeTrades = getVisibleTrades();
+      const activeClientIds = new Set(clients.filter(c => c.active !== false).map(c => c.id));
+      const activeTrades = getVisibleTrades().filter(t => activeClientIds.has(t.clientId));
       const poolTotalEl = document.getElementById('poolMtmTotal');
+      const showSquared = Boolean(document.getElementById('poolShowSquaredToggle') && document.getElementById('poolShowSquaredToggle').checked);
 
       if (activeTrades.length === 0) {
         if (poolTotalEl) poolTotalEl.innerHTML = '';
@@ -2128,11 +2661,17 @@
       });
 
       const rows = [];
-      let totalPoolMtm = 0;
+      let openLiveMtmTotal = 0;
+      let squaredRealizedTotal = 0;
+      let missingPoolCount = 0;
 
       for (const contract in poolMap) {
         const item = poolMap[contract];
         const net = item.buy - item.sell;
+        if (net === 0) {
+          squaredRealizedTotal += (item.sellVal - item.buyVal);
+          if (!showSquared) continue;
+        }
         const netHtml = net > 0
           ? `<span class="green">+${net} (LONG)</span>`
           : (net < 0 ? `<span class="red">${net} (SHORT)</span>` : `<span style="color:var(--muted)">0 (SQUARED)</span>`);
@@ -2142,11 +2681,22 @@
         else if (net < 0 && item.sell > 0) avgRate = item.sellVal / item.sell;
         else if (item.buy > 0) avgRate = item.buyVal / item.buy;
 
-        const cmp = getCmpForContract(contract, avgRate);
-        // Client-side total MTM = (sellVal - buyVal) + net * cmp
-        const contractMtm = (item.sellVal - item.buyVal) + (net * cmp);
-        totalPoolMtm += contractMtm;
-        const mtmHtml = `<span class="${contractMtm >= 0 ? 'green' : 'red'}">${contractMtm >= 0 ? '+₹' : '-₹'}${Math.abs(contractMtm).toFixed(0)}</span>`;
+        const cmpInfo = getCmpInfo(contract);
+        let cmpCell = `<span class="red" style="font-weight:700;">CMP નથી</span> <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:2px;" data-act="set-cmp" data-contract="${escapeHtml(contract)}" data-cmp="">Set</button>`;
+        let mtmHtml = `<span style="color:var(--muted);">CMP નથી</span>`;
+        if (net === 0) {
+          const sqPnl = item.sellVal - item.buyVal;
+          cmpCell = `<span style="color:var(--muted);">Squared</span>`;
+          mtmHtml = `<span class="${sqPnl >= 0 ? 'green' : 'red'}">${sqPnl >= 0 ? '+₹' : '-₹'}${Math.abs(sqPnl).toFixed(0)} <small>(Realized)</small></span>`;
+        } else if (!cmpInfo.missing) {
+          const cmp = cmpInfo.price;
+          const openMtm = (item.sellVal - item.buyVal) + (net * cmp);
+          openLiveMtmTotal += openMtm;
+          mtmHtml = `<span class="${openMtm >= 0 ? 'green' : 'red'}">${openMtm >= 0 ? '+₹' : '-₹'}${Math.abs(openMtm).toFixed(0)}</span>`;
+          cmpCell = `₹${cmp.toFixed(2)} ${renderCmpBadge(cmpInfo)} <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:2px;" data-act="set-cmp" data-contract="${escapeHtml(contract)}" data-cmp="${cmp}">Set</button>`;
+        } else {
+          missingPoolCount++;
+        }
 
         const brBreakdown = Object.entries(item.byBranch)
           .map(([b, q]) => `<span class="branch-pill">${escapeHtml(b)}: ${q >= 0 ? '+' + q : q}</span>`)
@@ -2157,29 +2707,73 @@
           <td>${item.buy} / ${item.sell}</td>
           <td>${netHtml}</td>
           <td><b>₹${avgRate.toFixed(2)}</b></td>
-          <td>₹${cmp.toFixed(2)} <button class="btn-edit" style="padding:2px 5px; font-size:10px; margin-left:4px;" onclick="openSetCmpModal('${escapeHtml(contract)}', ${cmp})">Set</button></td>
+          <td>${cmpCell}</td>
           <td>${mtmHtml}</td>
           <td>${brBreakdown}</td>
         </tr>`);
       }
-      tbody.innerHTML = rows.join('');
+      tbody.innerHTML = rows.length ? rows.join('') : `<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:14px;">No open contracts (toggle "Squared બતાવો" to view closed).</td></tr>`;
       if (poolTotalEl) {
-        poolTotalEl.innerHTML = `(Client MTM: <span class="${totalPoolMtm >= 0 ? 'green' : 'red'}">${totalPoolMtm >= 0 ? '+₹' : '-₹'}${Math.abs(totalPoolMtm).toFixed(0)}</span>)`;
+        const missNote = missingPoolCount > 0 ? ` <span class="amber" style="font-size:11px;">(Excl. ${missingPoolCount} w/o CMP)</span>` : '';
+        poolTotalEl.innerHTML = `(Open Live MTM: <span class="${openLiveMtmTotal >= 0 ? 'green' : 'red'}">${openLiveMtmTotal >= 0 ? '+₹' : '-₹'}${Math.abs(openLiveMtmTotal).toFixed(0)}</span>${missNote} | Squared P&amp;L: <span class="${squaredRealizedTotal >= 0 ? 'green' : 'red'}">${squaredRealizedTotal >= 0 ? '+₹' : '-₹'}${Math.abs(squaredRealizedTotal).toFixed(0)}</span>)`;
       }
     }
 
     function renderBranchesList() {
       const tbody = document.getElementById('branchesListBody');
-      const activeBranches = branches.filter(b => b.active !== false);
-      tbody.innerHTML = activeBranches.map(b => `
-        <tr>
-          <td><b>${escapeHtml(b.name)}</b></td>
+      tbody.innerHTML = branches.map(b => {
+        const isAct = b.active !== false;
+        const shareNum = parseFloat(String(b.sharePct || '0').replace('%', '')) || 0;
+        const actBtn = b.role === 'admin'
+          ? ''
+          : `<button class="btn-edit" data-act="edit-branch-share" data-id="${escapeHtml(b.id)}" data-share="${shareNum}" style="margin-left:4px;">Share ${shareNum}%</button>
+             <button class="${isAct ? 'btn-cancel' : 'btn-share'}" data-act="toggle-branch" data-id="${escapeHtml(b.id)}" data-active="${isAct ? '1' : '0'}" style="margin-left:4px;">${isAct ? 'Disable' : 'Enable'}</button>`;
+        return `
+        <tr style="${isAct ? '' : 'opacity:0.55;'}">
+          <td><b>${escapeHtml(b.name)}</b> ${isAct ? '' : '<span class="red" style="font-size:10px;">(DISABLED)</span>'}</td>
           <td>${escapeHtml(b.prefix)}</td>
           <td>${escapeHtml(b.operatorName || '-')}</td>
-          <td>${b.role === 'admin' ? '<span class="green">ADMIN</span>' : 'SUB-BROKER'}</td>
-          <td><button class="btn-edit" onclick="selectBranchForPin('${escapeHtml(b.id)}')">Change PIN</button></td>
-        </tr>
-      `).join('');
+          <td>${b.role === 'admin' ? '<span class="green">ADMIN</span>' : `SUB (${shareNum}%)`}</td>
+          <td><button class="btn-edit" data-act="sel-branch" data-id="${escapeHtml(b.id)}">PIN</button>${actBtn}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    let pendingEditBranchId = null;
+    function openEditBranchShareModal(branchId, curShare) {
+      pendingEditBranchId = branchId;
+      document.getElementById('editBranchLabel').innerText = `Branch: ${branchId.toUpperCase()}`;
+      document.getElementById('editBranchShareInput').value = curShare;
+      document.getElementById('editBranchModal').style.display = 'flex';
+    }
+    function closeEditBranchModal() {
+      pendingEditBranchId = null;
+      document.getElementById('editBranchModal').style.display = 'none';
+    }
+    async function confirmEditBranchShare() {
+      if (!pendingEditBranchId) return;
+      const pct = Math.max(0, Math.min(100, Number(document.getElementById('editBranchShareInput').value) || 0));
+      const res = await postToServerRaw({ action: "update_branch", id: pendingEditBranchId, sharePct: pct }, false);
+      if (res.unauthorized) { logout(); return; }
+      if (!res.ok) return showToast(res.message || "Update failed");
+      const br = branches.find(b => b.id === pendingEditBranchId);
+      if (br) br.sharePct = pct;
+      closeEditBranchModal();
+      saveState();
+      renderAll();
+      showToast(`Branch ${br ? br.name : ''} share updated to ${pct}%`);
+    }
+    async function toggleBranchActive(branchId, currentlyActive) {
+      const nextActive = !currentlyActive;
+      if (!(await askConfirmModal(`${nextActive ? 'Enable' : 'Disable'} branch ${branchId.toUpperCase()}?`, "Branch Status"))) return;
+      const res = await postToServerRaw({ action: "update_branch", id: branchId, active: nextActive }, false);
+      if (res.unauthorized) { logout(); return; }
+      if (!res.ok) return showToast(res.message || "Update failed");
+      const br = branches.find(b => b.id === branchId);
+      if (br) br.active = nextActive;
+      saveState();
+      renderAll();
+      showToast(`Branch ${branchId.toUpperCase()} ${nextActive ? 'enabled' : 'disabled'}.`);
     }
 
     function selectBranchForPin(branchId) {
@@ -2191,13 +2785,28 @@
     function renderSubBrokerSummary() {
       const tbody = document.getElementById('subBrokerSummaryBody');
       if (!tbody) return;
+      const periodVal = document.getElementById('subBrokerPeriodFilter') ? document.getElementById('subBrokerPeriodFilter').value : 'THIS_WEEK';
+      let pStart = 0, pEnd = Infinity;
+      if (periodVal === 'THIS_WEEK') {
+        const w = getWeekRange(0); pStart = w.start.getTime(); pEnd = w.end.getTime();
+      } else if (periodVal === 'LAST_WEEK') {
+        const w = getWeekRange(-1); pStart = w.start.getTime(); pEnd = w.end.getTime();
+      } else if (periodVal === 'THIS_MONTH') {
+        const now = new Date();
+        pStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+        pEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+      }
+
       const brokByBranch = {};
       getVisibleTrades().forEach(t => {
+        if (t.tradeType === 'MTM_ROLL') return;
+        const tMs = parseTradeDate(t);
+        if (periodVal !== 'ALL' && tMs > 0 && (tMs < pStart || tMs > pEnd)) return;
         const br = normalizeBranch(t.branch);
-        const c = clients.find(x => x.id === t.clientId);
-        const rate = c ? parseRate(c.rate) : 0.01;
-        const brok = (Number(t.basePrice) || Number(t.netRate)) * (Number(t.qty) || 0) * (rate / 100);
-        brokByBranch[br] = (brokByBranch[br] || 0) + brok;
+        const storedAmt = (t.brokerageAmt !== undefined && !isNaN(Number(t.brokerageAmt)))
+          ? Number(t.brokerageAmt)
+          : Math.abs(Number(t.netRate) - Number(t.basePrice || t.netRate)) * (Number(t.qty) || 0);
+        brokByBranch[br] = (brokByBranch[br] || 0) + storedAmt;
       });
       const rows = branches.filter(b => b.active !== false).map(b => {
         const totalBrok = brokByBranch[b.id] || 0;
@@ -2231,6 +2840,9 @@
     function renderBills() {
       const tbody = document.getElementById('billsBody');
       const visibleClients = getVisibleClients();
+      const selWeek = getSelectedBillWeek();
+      const wrEl = document.getElementById('weekRangeDisplay');
+      if (wrEl) wrEl.innerText = `Period: ${selWeek.label} (+ Carry-Fwd)`;
 
       if (visibleClients.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:14px;">No clients available.</td></tr>`;
@@ -2238,7 +2850,7 @@
       }
 
       tbody.innerHTML = visibleClients.map(c => {
-        const fifo = computeClientFIFO(c.id);
+        const fifo = computeClientFIFO(c.id, selWeek);
         const pnlDisplay = (fifo.realizedPnL >= 0 ? '+₹' : '-₹') + Math.abs(fifo.realizedPnL).toFixed(2);
         const pnlClass = fifo.realizedPnL >= 0 ? 'green' : 'red';
         const netDisplay = (fifo.netBalance >= 0 ? '+₹' : '-₹') + Math.abs(fifo.netBalance).toFixed(2);
@@ -2252,18 +2864,22 @@
 
         const mtmDisplay = (fifo.unrealizedMtm >= 0 ? '+₹' : '-₹') + Math.abs(fifo.unrealizedMtm).toFixed(0);
         const mtmClass = fifo.unrealizedMtm >= 0 ? 'green' : 'red';
+        const provBadge = fifo.hasProvisionalCmp ? ' <span class="amber" style="font-size:9px; font-weight:700;">PROV</span>' : '';
+        const mtmCell = fifo.openLots > 0
+          ? (fifo.hasMissingCmp && fifo.unrealizedMtm === 0 ? '<span class="red" style="font-size:11px;">CMP નથી</span>' : `${mtmDisplay}${provBadge}`)
+          : '<span style="color:var(--muted)">-</span>';
         return `<tr>
           <td><b>${escapeHtml(c.id)}</b> - ${escapeHtml(c.name)}</td>
           <td class="${pnlClass}"><b>${pnlDisplay}</b></td>
-          <td class="${mtmClass}">${fifo.openLots > 0 ? mtmDisplay : '<span style="color:var(--muted)">-</span>'}</td>
+          <td class="${mtmClass}">${mtmCell}</td>
           <td style="color:var(--muted);">${cashStr}</td>
           <td class="${netClass}"><b>${netDisplay}</b></td>
           <td>${openNotice}</td>
           <td>
-            <button class="btn-req" onclick="generateDailyPdf('${escapeHtml(c.id)}')">Daily</button>
-            <button class="btn-share" style="margin-left:4px;" onclick="openBillModal('${escapeHtml(c.id)}')">Bill</button>
-            <button class="btn-edit" style="margin-left:4px;" onclick="generatePdfBill('${escapeHtml(c.id)}')">PDF</button>
-            <button class="btn-wa" onclick="sendWhatsAppSummary('${escapeHtml(c.id)}')">WA</button>
+            <button class="btn-req" data-act="daily-pdf" data-id="${escapeHtml(c.id)}">Daily</button>
+            <button class="btn-share" style="margin-left:4px;" data-act="open-bill" data-id="${escapeHtml(c.id)}">Bill</button>
+            <button class="btn-edit" style="margin-left:4px;" data-act="full-pdf" data-id="${escapeHtml(c.id)}">PDF</button>
+            <button class="btn-wa" data-act="wa-bill" data-id="${escapeHtml(c.id)}">WA</button>
           </td>
         </tr>`;
       }).join('');
@@ -2283,8 +2899,8 @@
           <td style="white-space:normal;"><b>${escapeHtml(c.id)}</b> - ${escapeHtml(c.name)}<span class="timestamp-text">${escapeHtml(normalizeBranch(c.branch).toUpperCase())} | ${escapeHtml(c.mobile || '-')}</span></td>
           <td><b>${parseRate(c.rate)}%</b></td>
           <td style="text-align:right;">
-            <button class="btn-edit" onclick="startEditClient('${escapeHtml(c.id)}')">Edit</button>
-            <button class="btn-cancel" onclick="openRemoveClientModal('${escapeHtml(c.id)}')">Delete</button>
+            <button class="btn-edit" data-act="edit-client" data-id="${escapeHtml(c.id)}">Edit</button>
+            <button class="btn-cancel" data-act="del-client" data-id="${escapeHtml(c.id)}">Delete</button>
           </td>
         </tr>
       `).join('');
@@ -2300,7 +2916,7 @@
       fifo.openPositions.forEach(o => {
         if (!groups[o.contract]) groups[o.contract] = { closed: [], open: [], realized: 0, mtm: 0 };
         groups[o.contract].open.push(o);
-        groups[o.contract].mtm += o.mtm;
+        if (o.mtm !== null) groups[o.contract].mtm += o.mtm;
       });
       return groups;
     }
@@ -2308,7 +2924,8 @@
     function openBillModal(clientId) {
       const client = clients.find(c => c.id === clientId);
       if (!client) return;
-      const fifo = computeClientFIFO(clientId);
+      const selWeek = getSelectedBillWeek();
+      const fifo = computeClientFIFO(clientId, selWeek);
       const area = document.getElementById('billPrintableArea');
       const groups = buildContractGroups(fifo);
       const contractNames = Object.keys(groups);
@@ -2333,15 +2950,18 @@
             });
 
             g.open.forEach(o => {
+              const cmpLabel = o.cmpMissing ? 'CMP નથી' : ('CMP ₹' + o.cmp.toFixed(2) + (o.cmpCash ? ' (Cash)' : (o.cmpStale ? ' (Stale)' : '')));
+              const mtmTxt = o.cmpMissing ? 'CMP નથી' : `${o.mtm >= 0 ? '+' : '-'}₹${Math.abs(o.mtm).toFixed(2)}`;
+              const mtmClr = o.cmpMissing ? '#b45309' : (o.mtm >= 0 ? '#059669' : '#dc2626');
               rows.push(`
                 <tr style="background:#fffbeb;">
                   <td><span class="tag-pos">CARRY-FWD</span></td>
                   <td>${escapeHtml(o.entryDate)}</td>
                   <td>OPEN (${o.side})</td>
                   <td>${o.qty}</td>
-                  <td>${o.side === 'BUY' ? '₹' + o.openRate.toFixed(2) : 'CMP ₹' + o.cmp.toFixed(2)}</td>
-                  <td>${o.side === 'SELL' ? '₹' + o.openRate.toFixed(2) : 'CMP ₹' + o.cmp.toFixed(2)}</td>
-                  <td style="font-weight:700; color:${o.mtm >= 0 ? '#059669' : '#dc2626'};">${o.mtm >= 0 ? '+' : '-'}₹${Math.abs(o.mtm).toFixed(2)}</td>
+                  <td>${o.side === 'BUY' ? '₹' + o.openRate.toFixed(2) : cmpLabel}</td>
+                  <td>${o.side === 'SELL' ? '₹' + o.openRate.toFixed(2) : cmpLabel}</td>
+                  <td style="font-weight:700; color:${mtmClr};">${mtmTxt}</td>
                 </tr>`);
             });
 
@@ -2364,11 +2984,15 @@
         : `<div style="text-align:center; color:#64748b; padding:16px;">No trades found for this client.</div>`;
 
       const netWithMtm = fifo.netBalance + fifo.unrealizedMtm;
+      const provBanner = fifo.hasProvisionalCmp
+        ? `<div style="background:#fef3c7; border:1px solid #f59e0b; color:#92400e; padding:8px 10px; border-radius:6px; margin-bottom:10px; font-size:11px; font-weight:700;">⚠️ PROVISIONAL BILL — Some open positions have missing, Cash-fallback, or Stale (&gt;24h) CMP. Missing CMP is excluded from MTM total.</div>`
+        : '';
       area.innerHTML = `
+        ${provBanner}
         <div style="display:flex; justify-content:space-between; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:12px;">
           <div>
             <div style="font-size:15px; font-weight:800;">NSE F&O — WEEKLY SETTLEMENT BILL</div>
-            <div style="font-size:11px; color:#475569;">Period: ${escapeHtml(currentWeek.label)}</div>
+            <div style="font-size:11px; color:#475569;">Period: ${escapeHtml(selWeek.label)}</div>
           </div>
           <div style="text-align:right;">
             <div style="font-weight:700;">${escapeHtml(client.id)} - ${escapeHtml(client.name)}</div>
@@ -2379,13 +3003,14 @@
         ${groupHtml}
 
         <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px; margin-top:8px; line-height:1.8;">
-          <div><b>Realized P&L (Closed):</b> ${fifo.realizedPnL >= 0 ? '+' : '-'}₹${Math.abs(fifo.realizedPnL).toFixed(2)}</div>
+          ${!selWeek.isAll ? `<div><b>Opening Balance (Before Week):</b> ${fifo.openingBalance >= 0 ? '+' : '-'}₹${Math.abs(fifo.openingBalance).toFixed(2)}</div>` : ''}
+          <div><b>${selWeek.isAll ? 'Realized P&L (All Closed)' : 'Weekly Realized P&L (Closed)'}:</b> ${fifo.realizedPnL >= 0 ? '+' : '-'}₹${Math.abs(fifo.realizedPnL).toFixed(2)}</div>
           <div><b>Open Carry-Fwd MTM:</b> ${fifo.unrealizedMtm >= 0 ? '+' : '-'}₹${Math.abs(fifo.unrealizedMtm).toFixed(2)}</div>
-          <div><b>Cash Paid / Received:</b> Paid ₹${fifo.cashPaidToClient.toFixed(2)} | Rcvd ₹${fifo.cashReceivedFromClient.toFixed(2)}</div>
+          <div><b>${selWeek.isAll ? 'Cash Paid / Received' : 'Weekly Cash Paid / Received'}:</b> Paid ₹${fifo.cashPaidToClient.toFixed(2)} | Rcvd ₹${fifo.cashReceivedFromClient.toFixed(2)}</div>
           <div style="font-size:13px; border-top:1px solid #cbd5e1; margin-top:4px; padding-top:4px;">
-            <b>Net Settled Balance (Excl. Open MTM):</b>
+            <b>Closing Balance (Excl. Open MTM):</b>
             <span style="color:${fifo.netBalance >= 0 ? '#059669' : '#dc2626'}; font-weight:800;">
-              ${fifo.netBalance >= 0 ? '+' : '-'}₹${Math.abs(fifo.netBalance).toFixed(2)} (${fifo.netBalance >= 0 ? 'લેવાના / Credit' : 'આપવાના / Debit'})
+              ${fifo.netBalance >= 0 ? '+' : '-'}₹${Math.abs(fifo.netBalance).toFixed(2)} (${fifo.netBalance >= 0 ? 'ગ્રાહકને મળવાના / Credit' : 'ગ્રાહક પાસેથી લેવાના / Debit'})
             </span>
           </div>
           <div style="font-size:12px; color:#334155;">
@@ -2406,7 +3031,8 @@
       const client = clients.find(c => c.id === clientId);
       if (!client) return;
       if (!window.jspdf || !window.jspdf.jsPDF) {
-        showToast("PDF library loading... please try again.");
+        showToast("PDF library unavailable — using browser Print fallback.");
+        window.print();
         return;
       }
 
@@ -2509,14 +3135,23 @@
         doc.setFont(undefined, 'normal');
         doc.text('No open positions standing.', 14, yPos);
       } else {
+        if (fifo.hasProvisionalCmp) {
+          doc.setFillColor(254, 243, 199);
+          doc.rect(14, yPos, 182, 7, 'F');
+          doc.setTextColor(146, 64, 14);
+          doc.setFontSize(8.5);
+          doc.setFont(undefined, 'bold');
+          doc.text('PROVISIONAL: Some open CMP missing, Cash-fallback, or Stale (>24h). Missing CMP excluded.', 17, yPos + 4.8);
+          yPos += 9;
+        }
         const oRows = fifo.openPositions.map(o => [
           o.contract,
           o.entryDate,
           o.side,
           String(o.qty),
           fmtPlain(o.openRate),
-          fmtPlain(o.cmp),
-          fmtRs(o.mtm)
+          o.cmpMissing ? 'CMP Missing' : fmtPlain(o.cmp),
+          o.cmpMissing ? 'N/A' : fmtRs(o.mtm)
         ]);
         doc.autoTable({
           startY: yPos,
@@ -2573,13 +3208,16 @@
       const client = clients.find(c => c.id === clientId);
       if (!client) return;
       if (!window.jspdf || !window.jspdf.jsPDF) {
-        showToast("PDF library loading... please try again.");
+        showToast("PDF library unavailable — opening Print view.");
+        openBillModal(clientId);
+        setTimeout(() => window.print(), 250);
         return;
       }
 
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const fifo = computeClientFIFO(clientId);
+      const selWeek = getSelectedBillWeek();
+      const fifo = computeClientFIFO(clientId, selWeek);
       const groups = buildContractGroups(fifo);
       const contractNames = Object.keys(groups);
       const fmtRs = (v) => (v < 0 ? '-Rs. ' : v > 0 ? '+Rs. ' : 'Rs. ') + Math.abs(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2596,7 +3234,7 @@
       doc.setTextColor(226, 232, 240);
       doc.setFontSize(9.5);
       doc.setFont(undefined, 'normal');
-      doc.text(`Settlement Period: ${currentWeek.label}`, 14, 21);
+      doc.text(`Settlement Period: ${selWeek.label}`, 14, 21);
       doc.text(`Branch: ${normalizeBranch(client.branch).toUpperCase()}`, 14, 27);
 
       doc.setTextColor(255, 255, 255);
@@ -2608,6 +3246,15 @@
       doc.text(`Mobile: ${client.mobile || '-'} | Brok: ${parseRate(client.rate)}%`, 196, 22, { align: 'right' });
 
       let yPos = 40;
+      if (fifo.hasProvisionalCmp) {
+        doc.setFillColor(254, 243, 199);
+        doc.rect(14, yPos - 4, 182, 7.5, 'F');
+        doc.setTextColor(146, 64, 14);
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, 'bold');
+        doc.text('PROVISIONAL BILL: Some open CMP missing, Cash-fallback, or Stale (>24h). Missing CMP excluded.', 17, yPos + 1);
+        yPos += 7;
+      }
 
       if (contractNames.length === 0) {
         doc.setTextColor(100, 116, 139);
@@ -2644,14 +3291,15 @@
             ]);
           });
           g.open.forEach(o => {
+            const cmpTxt = o.cmpMissing ? 'CMP Missing' : ('CMP ' + fmtPlain(o.cmp));
             bodyRows.push([
               `CARRY-FWD (${o.side})`,
               o.entryDate,
               'OPEN',
               String(o.qty),
-              o.side === 'BUY' ? fmtPlain(o.openRate) : 'CMP ' + fmtPlain(o.cmp),
-              o.side === 'SELL' ? fmtPlain(o.openRate) : 'CMP ' + fmtPlain(o.cmp),
-              fmtRs(o.mtm)
+              o.side === 'BUY' ? fmtPlain(o.openRate) : cmpTxt,
+              o.side === 'SELL' ? fmtPlain(o.openRate) : cmpTxt,
+              o.cmpMissing ? 'N/A' : fmtRs(o.mtm)
             ]);
           });
 
@@ -2695,14 +3343,15 @@
 
       doc.setFontSize(9.5);
       doc.setFont(undefined, 'normal');
-      doc.text(`Realized P&L (Closed Trades): ${fmtRs(fifo.realizedPnL)}`, 18, yPos + 14);
+      const obLine = !selWeek.isAll ? `Opening: ${fmtRs(fifo.openingBalance)}  |  ` : '';
+      doc.text(`${obLine}Weekly Realized: ${fmtRs(fifo.realizedPnL)}`, 18, yPos + 14);
       doc.text(`Open Carry-Forward MTM: ${fmtRs(fifo.unrealizedMtm)}`, 18, yPos + 20);
       doc.text(`Cash Paid: ${fmtPlain(fifo.cashPaidToClient)}   |   Cash Received: ${fmtPlain(fifo.cashReceivedFromClient)}`, 18, yPos + 26);
 
       doc.setFont(undefined, 'bold');
       doc.setFontSize(10.5);
       doc.setTextColor(fifo.netBalance >= 0 ? 5 : 220, fifo.netBalance >= 0 ? 150 : 38, fifo.netBalance >= 0 ? 105 : 38);
-      doc.text(`Net Settled Balance (Excl. Open MTM): ${fmtRs(fifo.netBalance)} (${fifo.netBalance >= 0 ? 'Credit / Receivable' : 'Debit / Payable'})`, 18, yPos + 33);
+      doc.text(`Closing Balance (Excl. Open MTM): ${fmtRs(fifo.netBalance)} (${fifo.netBalance >= 0 ? 'Credit / Client Receivable' : 'Debit / Client Payable'})`, 18, yPos + 33);
 
       doc.setFontSize(9.5);
       doc.setTextColor(51, 65, 85);
@@ -2718,7 +3367,7 @@
           await navigator.share({
             files: [pdfFile],
             title: `Weekly Bill - ${client.name} (${client.id})`,
-            text: `NSE F&O Weekly Settlement Bill (${currentWeek.label})`
+            text: `NSE F&O Weekly Settlement Bill (${selWeek.label})`
           });
           showToast("PDF shared successfully!");
           return;
@@ -2738,25 +3387,12 @@
     function sendWhatsAppSummary(clientId) {
       const client = clients.find(c => c.id === clientId);
       if (!client || !client.mobile) return showToast("Mobile number missing!");
-      const fifo = computeClientFIFO(clientId);
-      const groups = buildContractGroups(fifo);
-      const contractNames = Object.keys(groups);
-
-      let groupText = contractNames.map(contract => {
-        const g = groups[contract];
-        const lines = [];
-        g.closed.forEach(p => {
-          lines.push(`  • [${p.isIntraday ? 'INTRA' : 'POS'}] ${p.entryDate}→${p.exitDate} | Qty:${p.qty} | ${p.pnl >= 0 ? '+' : '-'}₹${Math.abs(p.pnl).toFixed(0)}`);
-        });
-        g.open.forEach(o => {
-          lines.push(`  • [CARRY-FWD ${o.side}] ${o.entryDate} | Qty:${o.qty} @ ₹${o.openRate.toFixed(2)} (CMP ₹${o.cmp.toFixed(2)}) | MTM: ${o.mtm >= 0 ? '+' : '-'}₹${Math.abs(o.mtm).toFixed(0)}`);
-        });
-        const sub = g.realized + g.mtm;
-        return `*${contract}* (Net: ${sub >= 0 ? '+' : '-'}₹${Math.abs(sub).toFixed(0)})\n${lines.join('\n')}`;
-      }).join('\n\n');
-      if (!groupText) groupText = "• No trades";
-
-      const msg = `*NSE F&O WEEKLY BILL*\n*${client.name} (${client.id})*\nPeriod: ${currentWeek.label}\n\n${groupText}\n\n*Summary:*\nRealized P&L: ₹${fifo.realizedPnL.toFixed(2)}\nOpen MTM: ₹${fifo.unrealizedMtm.toFixed(2)}\nCash Paid: ₹${fifo.cashPaidToClient.toFixed(2)} | Rcvd: ₹${fifo.cashReceivedFromClient.toFixed(2)}\n*Net Balance:* ₹${fifo.netBalance.toFixed(2)} (${fifo.netBalance >= 0 ? 'Credit / લેવાના' : 'Debit / આપવાના'})`;
+      const selWeek = getSelectedBillWeek();
+      const fifo = computeClientFIFO(clientId, selWeek);
+      const provWarn = fifo.hasProvisionalCmp ? `⚠️ *PROVISIONAL BILL* (Some open CMP missing/Cash/Stale)\n` : '';
+      const obWa = !selWeek.isAll ? `Opening Bal: ₹${fifo.openingBalance.toFixed(2)}\n` : '';
+      const balLabel = fifo.netBalance >= 0 ? 'ગ્રાહકને મળવાના / Credit' : 'ગ્રાહક પાસેથી લેવાના / Debit';
+      const msg = `${provWarn}*NSE F&O WEEKLY SUMMARY*\n*${client.name} (${client.id})*\nPeriod: ${selWeek.label}\n\n${obWa}Weekly Realized P&L: ${fifo.realizedPnL >= 0 ? '+' : '-'}₹${Math.abs(fifo.realizedPnL).toFixed(2)}\nOpen Carry-Fwd (${fifo.openLots} qty) MTM: ${fifo.unrealizedMtm >= 0 ? '+' : '-'}₹${Math.abs(fifo.unrealizedMtm).toFixed(2)}\nCash Paid: ₹${fifo.cashPaidToClient.toFixed(2)} | Rcvd: ₹${fifo.cashReceivedFromClient.toFixed(2)}\n*Closing Balance:* ${fifo.netBalance >= 0 ? '+' : '-'}₹${Math.abs(fifo.netBalance).toFixed(2)} (${balLabel})\n\n_(Detailed contract-wise PDF attached/shared separately)_`;
       const url = `https://wa.me/91${client.mobile}?text=${encodeURIComponent(msg)}`;
       window.open(url, '_blank');
     }
@@ -2769,11 +3405,12 @@
         .filter(t => t.clientId === clientId && t.status !== 'CANCELLED')
         .slice()
         .sort((a, b) => parseTradeDate(a) - parseTradeDate(b));
-      const fifo = computeClientFIFO(clientId);
+      const selWeek = getSelectedBillWeek();
+      const fifo = computeClientFIFO(clientId, selWeek);
 
       let csv = "\uFEFFNSE F&O WEEKLY SETTLEMENT STATEMENT (WITH CASH LEDGER & CARRY-FORWARD)\r\n";
       csv += `Client Name: "${sanitizeCsvCell(client.name)} (${sanitizeCsvCell(client.id)})"\r\n`;
-      csv += `Settlement Cycle: ${currentWeek.label}\r\n`;
+      csv += `Settlement Cycle: ${selWeek.label}\r\n`;
       csv += "--------------------------------------------------------\r\n";
       csv += "Timestamp,Trade ID,Contract,Side,Qty,Execution Rate,Gross Amount\r\n";
 
@@ -2793,7 +3430,7 @@
       const file = new File([blob], filename, { type: 'text/csv' });
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: `Statement - ${client.name}`, text: `NSE F&O Statement (${currentWeek.label})` }).catch(() => {});
+        navigator.share({ files: [file], title: `Statement - ${client.name}`, text: `NSE F&O Statement (${selWeek.label})` }).catch(() => {});
       } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2827,6 +3464,15 @@
       const brokerageFactor = basePrice * (brokerageRate / 100);
       const netRate = side === 'BUY' ? (basePrice + brokerageFactor) : (basePrice - brokerageFactor);
 
+      const cmpInfo = getCmpInfo(contract);
+      const isManualOverride = cmpInfo.missing || Math.abs(basePrice - Number(cmpInfo.price)) > 0.01;
+      const effSource = isManualOverride ? 'MANUAL' : cmpInfo.source;
+      const srcLabel = effSource === 'NSE_FUT' ? 'NSE Futures' : (effSource === 'CASH_FALLBACK' ? 'Yahoo Cash Price (Fallback)' : (effSource === 'SHEET_FUT' ? 'Sheet Futures' : 'Manual Entry'));
+      const cashWarnHtml = (!isManualOverride && effSource === 'CASH_FALLBACK')
+        ? `<div style="background:rgba(245,158,11,0.18); border:1px solid var(--amber); color:#fde68a; padding:6px 8px; border-radius:6px; margin-top:6px; font-size:11px;">⚠️ <b>Cash Price Warning:</b> NSE Futures rate was unavailable; using Cash market price. Verify before confirming.</div>`
+        : ((!isManualOverride && cmpInfo.isStale)
+          ? `<div style="background:rgba(239,68,68,0.18); border:1px solid var(--red); color:#fecaca; padding:6px 8px; border-radius:6px; margin-top:6px; font-size:11px;">⚠️ <b>Stale Price Warning:</b> This CMP is older than 24 hours (${formatPriceAge(cmpInfo.updatedAtMs)}).</div>`
+          : '');
       pendingOrder = { clientObj, contract, side, qty, basePrice, brokerageRate, netRate };
       document.getElementById('orderModalDetails').innerHTML = `
         <div><b>Client:</b> ${escapeHtml(clientObj.id)} - ${escapeHtml(clientObj.name)}</div>
@@ -2835,7 +3481,9 @@
         <div><b>Side:</b> <span class="${side === 'BUY' ? 'green' : 'red'}">${side}</span></div>
         <div><b>Quantity:</b> ${qty} shares</div>
         <div><b>Price:</b> ₹${basePrice.toFixed(2)} (Brok: ${brokerageRate}%)</div>
+        <div><b>Price Source:</b> ${escapeHtml(srcLabel)}</div>
         <div><b>Net Rate:</b> ₹${netRate.toFixed(2)}</div>
+        ${cashWarnHtml}
       `;
       document.getElementById('orderModal').style.display = 'flex';
     }
@@ -2854,7 +3502,7 @@
       const formattedTimestamp = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${now.toLocaleTimeString('en-IN', { hour12: false })}`;
 
       const tradeObj = {
-        id: "TR_" + crypto.randomUUID().slice(0, 8),
+        id: generateShortId("TR_"),
         clientId: clientObj.id,
         clientName: clientObj.name,
         branch: normalizeBranch(clientObj.branch),
@@ -2867,7 +3515,10 @@
         isoDate: now.toISOString(),
         expiry: selectedExpiryType === 'CURRENT' ? currentExp.formatted : nextExp.formatted,
         status: "OPEN",
-        cancelReq: false
+        cancelReq: false,
+        tradeType: "NORMAL",
+        brokerageRate: parseRate(clientObj.rate),
+        brokerageAmt: Number((basePrice * (parseRate(clientObj.rate) / 100) * qty).toFixed(2))
       };
 
       trades.push(tradeObj);
@@ -2886,10 +3537,11 @@
         basePrice: tradeObj.basePrice,
         netRate: Number(netRate).toFixed(2),
         expiry: tradeObj.expiry
-      });
+      }, 'trade', tradeObj);
 
       showToast(`Order Placed: ${tradeObj.contract} (${side} ${qty}) @ ₹${netRate.toFixed(2)}`);
       renderAll();
+      setTimeout(() => syncFromGoogleSheet(false), 1200);
     }
 
 
@@ -2899,6 +3551,7 @@
       if (!currentSession || currentSession.role !== 'admin') return;
       const t = trades.find(x => x.id === tradeId);
       if (!t) return;
+      if (t.status === 'CANCELLED') return showToast("Cannot edit a CANCELLED trade!");
       pendingEditTradeId = tradeId;
       document.getElementById('editTradeInfo').innerText = `${t.clientId} - ${t.clientName} | ${t.contract}`;
       document.getElementById('editTradeSide').value = t.action;
@@ -2916,41 +3569,45 @@
     async function confirmEditTrade() {
       if (!currentSession || currentSession.role !== 'admin' || !pendingEditTradeId) return;
       const pin = document.getElementById('editTradePin').value.trim();
-      const pinHash = await sha256(pin);
-      const adminBranch = branches.find(b => b.role === 'admin' && b.pinHash === pinHash);
-      if (!adminBranch) return showToast("Incorrect Master Admin Password / PIN!");
+      if (!pin) return showToast("Enter Master Admin Password!");
 
       const t = trades.find(x => x.id === pendingEditTradeId);
       if (!t) return;
+      if (t.status === 'CANCELLED') return showToast("Cannot edit a CANCELLED trade!");
 
       const side = document.getElementById('editTradeSide').value;
       const qty = parseInt(document.getElementById('editTradeQty').value, 10) || 0;
       const basePrice = parseFloat(document.getElementById('editTradePrice').value) || 0;
       if (qty <= 0 || basePrice <= 0) return showToast("Enter valid Qty and Price!");
 
-      const c = clients.find(x => x.id === t.clientId);
-      const brokRate = c ? parseRate(c.rate) : 0.01;
-      const brokFactor = basePrice * (brokRate / 100);
-      const netRate = side === 'BUY' ? (basePrice + brokFactor) : (basePrice - brokFactor);
+      const res = await postToServerRaw({
+        action: "edit_trade",
+        adminPin: pin,
+        id: t.id,
+        side: side,
+        qty: qty,
+        basePrice: basePrice
+      }, false);
+
+      if (res.unauthorized) { showToast('Session expired — please login again.'); logout(); return; }
+      if (!res.ok) {
+        return showToast(res.offline ? "Offline — trade edit requires server verification!" : ("Edit Rejected: " + (res.message || "Invalid Password")));
+      }
+
+      const srvNet = (res.data && Number(res.data.netRate) > 0) ? Number(res.data.netRate) : basePrice;
+      const srvBrokRate = (res.data && res.data.brokerageRate !== undefined) ? Number(res.data.brokerageRate) : (t.brokerageRate || 0.01);
+      const srvBrokAmt = (res.data && res.data.brokerageAmt !== undefined) ? Number(res.data.brokerageAmt) : (t.brokerageAmt || 0);
 
       t.action = side;
       t.qty = qty;
       t.basePrice = basePrice;
-      t.netRate = netRate;
+      t.netRate = srvNet;
+      t.brokerageRate = srvBrokRate;
+      t.brokerageAmt = srvBrokAmt;
       saveState();
-
-      syncToGoogleSheet({
-        action: "edit_trade",
-        id: t.id,
-        side: side,
-        qty: qty,
-        basePrice: basePrice,
-        netRate: Number(netRate).toFixed(2)
-      });
-
       closeEditTradeModal();
       renderAll();
-      showToast(`Trade updated: ${t.contract} (${side} ${qty}) @ ₹${netRate.toFixed(2)}`);
+      showToast(`Trade updated: ${t.contract} (${side} ${qty}) @ ₹${srvNet.toFixed(2)}`);
     }
 
 
@@ -2972,7 +3629,7 @@
       if (p <= 0) return showToast("Enter valid Futures CMP!");
       const contract = pendingSetCmpContract;
       const sym = extractStockSymbol(contract);
-      saveLivePrice(sym, p, contract);
+      saveLivePrice(sym, p, contract, 'MANUAL_FUT', Date.now());
       syncToGoogleSheet({ action: 'save_contract_rate', contract: contract, symbol: sym, expiry: '', price: p });
       closeSetCmpModal();
       renderAll();
@@ -2992,32 +3649,26 @@
 
     async function confirmAdminDelete() {
       const pin = document.getElementById('modalPinInput').value.trim();
-      const pinHash = await sha256(pin);
-      const adminBranch = branches.find(b => b.role === 'admin' && b.pinHash === pinHash);
+      if (!pin) return showToast("Enter Master Admin Password!");
+      const t = trades.find(x => x.id === pendingDeleteTradeId);
+      if (!t) return closeDeleteModal();
 
-      if (adminBranch) {
-        const t = trades.find(x => x.id === pendingDeleteTradeId);
-        if (t) {
-          t.status = "CANCELLED";
-          saveState();
-
-          syncToGoogleSheet({
-            action: "cancel_trade",
-            id: t.id,
-            status: "CANCELLED",
-            reason: "Admin Delete by HO"
-          });
-
-          showToast("Trade Cancelled and Logged.");
-          renderAll();
-        }
+      const ok = await syncToGoogleSheet({
+        action: "cancel_trade",
+        adminPin: pin,
+        id: t.id,
+        status: "CANCELLED",
+        reason: "Admin Delete by HO"
+      });
+      if (ok) {
+        t.status = "CANCELLED";
+        saveState();
+        showToast("Trade Cancelled and Logged.");
+        renderAll();
         closeDeleteModal();
-      } else {
-        showToast("Incorrect Master PIN!");
       }
     }
 
-    let pendingReqCancelTradeId = null;
     function openReqCancelModal(tradeId) {
       pendingReqCancelTradeId = tradeId;
       document.getElementById('reqCancelReason').value = '';
@@ -3050,12 +3701,14 @@
       }
     }
 
-    function saveClient() {
+    async function saveClient() {
       const id = document.getElementById('newClientId').value.trim();
       const name = document.getElementById('newClientName').value.trim();
       const mobile = document.getElementById('newClientMobile').value.trim();
       const rawRate = parseFloat(document.getElementById('newClientRate').value);
-      const rate = isNaN(rawRate) ? 0.01 : Math.max(0, Math.min(1, rawRate));
+      const rate = (currentSession.role === 'admin')
+        ? (isNaN(rawRate) ? 0.01 : Math.max(0, Math.min(1, rawRate)))
+        : (isEditingClientId ? parseRate((clients.find(c => c.id === isEditingClientId) || {}).rate) : 0.01);
       const branch = currentSession.role === 'admin'
         ? normalizeBranch(document.getElementById('newClientBranch').value)
         : currentSession.branchId;
@@ -3082,21 +3735,27 @@
         showToast(`Client ${id} updated.`);
         cancelEdit();
       } else {
-        if (clients.some(c => c.id === id)) {
-          autoGenerateClientId();
-          return showToast("ID refreshed to avoid duplicate, please click Save again.");
+        const payload = { action: "add_client", name: name, mobile: mobile, rate: rate, branch: branch };
+        const res = await postToServerRaw(payload, false);
+        if (res.aborted) return;
+        if (res.unauthorized) {
+          showToast('Session expired — please login again.');
+          logout();
+          return;
         }
-        clients.push({ id, name, branch, mobile: mobile, rate: rate, active: true });
-        showToast(`Client ${name} registered under ${id}.`);
-
-        syncToGoogleSheet({
-          action: "add_client",
-          id: id,
-          name: name,
-          mobile: mobile,
-          rate: rate,
-          branch: branch
-        });
+        if (res.ok && res.data && res.data.clientId) {
+          const serverId = res.data.clientId;
+          clients.push({ id: serverId, name, branch: res.data.branch || branch, mobile, rate, active: true });
+          showToast(`Client ${name} registered under ${serverId}.`);
+        } else if (res.offline) {
+          const tempClient = { id, name, branch, mobile, rate, active: true };
+          clients.push(tempClient);
+          enqueueOutbox(payload, 'client', tempClient);
+          showToast(`Offline: ${name} queued (Pending ${outboxQueue.length})`);
+        } else {
+          showToast('Error: ' + (res.message || 'Could not add client'));
+          return;
+        }
 
         document.getElementById('newClientName').value = '';
         document.getElementById('newClientMobile').value = '';
@@ -3117,6 +3776,7 @@
       document.getElementById('newClientName').value = client.name;
       document.getElementById('newClientMobile').value = client.mobile || client.phone || '';
       document.getElementById('newClientRate').value = parseRate(client.rate);
+      document.getElementById('newClientRate').readOnly = (currentSession.role !== 'admin');
       if (currentSession.role === 'admin') document.getElementById('newClientBranch').value = normalizeBranch(client.branch);
 
       document.getElementById('saveClientBtn').innerText = "Update Client";
@@ -3131,10 +3791,18 @@
       document.getElementById('newClientMobile').value = '';
       document.getElementById('saveClientBtn').innerText = "Save Client";
       document.getElementById('cancelEditBtn').style.display = "none";
+      document.getElementById('newClientRate').readOnly = !(currentSession && currentSession.role === 'admin');
       autoGenerateClientId();
     }
 
     function openRemoveClientModal(id) {
+      const fifo = computeClientFIFO(id);
+      if (fifo.openLots > 0) {
+        return showToast(`Blocked: Client ${id} has ${fifo.openLots} open carry-forward qty!`);
+      }
+      if (Math.abs(fifo.netBalance) > 0.01) {
+        return showToast(`Blocked: Client ${id} has pending balance ₹${fifo.netBalance.toFixed(2)}!`);
+      }
       pendingRemoveClientId = id;
       document.getElementById('removeClientMsg').innerText = `Remove client ${id}? Trade history will remain intact for audit.`;
       document.getElementById('removeClientModal').style.display = 'flex';
@@ -3145,15 +3813,24 @@
       document.getElementById('removeClientModal').style.display = 'none';
     }
 
-    function confirmSoftRemoveClient() {
+    async function confirmSoftRemoveClient() {
       if (!pendingRemoveClientId) return;
       const id = pendingRemoveClientId;
+      const fifo = computeClientFIFO(id);
+      if (fifo.openLots > 0 || Math.abs(fifo.netBalance) > 0.01) {
+        closeRemoveClientModal();
+        return showToast(`Blocked: Client ${id} has open position or non-zero balance.`);
+      }
       closeRemoveClientModal();
+      const res = await postToServerRaw({ action: "remove_client", id: id }, false);
+      if (res.unauthorized) { showToast('Session expired — please login again.'); logout(); return; }
+      if (!res.ok) {
+        return showToast(res.offline ? "Offline — cannot verify client removal." : ("Blocked: " + (res.message || "Error")));
+      }
       const client = clients.find(c => c.id === id);
       if (client) {
         client.active = false;
         saveState();
-        syncToGoogleSheet({ action: "remove_client", id: id });
         renderAll();
         autoGenerateClientId();
         showToast(`Client ${id} removed.`);
@@ -3170,46 +3847,65 @@
 
       if (!name) return showToast("Enter branch name!");
       if (!/^[A-Z]{1,3}$/.test(prefix)) return showToast("Enter a 1-3 letter Prefix (e.g. M, T)!");
-      if (pin.length < 4) return showToast("Branch PIN must be at least 4 characters!");
+      if (pin.length < 8) return showToast("Branch password must be at least 8 characters!");
 
       const branchId = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || ('br_' + Date.now());
       if (branches.some(b => b.id === branchId)) return showToast("Branch already exists!");
-      const pinHash = await sha256(pin);
-      if (branches.some(b => b.pinHash === pinHash)) return showToast("This PIN is already used by another branch!");
 
-      const newBr = {
+      const ok = await syncToGoogleSheet({
+        action: "add_branch",
         id: branchId,
         name: name,
         prefix: prefix,
-        pinHash: pinHash,
+        pin: pin,
         role: "sub",
         operatorName: operatorName,
-        sharePct: sharePct + "%",
-        active: true
-      };
-      branches.push(newBr);
-      saveState();
-
-      syncToGoogleSheet({
-        action: "add_branch",
-        id: newBr.id,
-        name: newBr.name,
-        prefix: newBr.prefix,
-        pinHash: newBr.pinHash,
-        role: "sub",
-        operatorName: newBr.operatorName,
         sharePct: sharePct
       });
+      if (!ok) return;
 
       document.getElementById('newBranchName').value = '';
       document.getElementById('newBranchPrefix').value = '';
       document.getElementById('newBranchOperator').value = '';
       document.getElementById('newBranchPin').value = '';
-      renderAll();
+      await syncFromGoogleSheet(true);
       showToast(`Branch ${name} (${prefix}) created & synced!`);
     }
 
 
+    function togglePassVis(inputId, btn) {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      if (el.type === 'password') {
+        el.type = 'text';
+        btn.innerText = 'Hide';
+      } else {
+        el.type = 'password';
+        btn.innerText = 'Show';
+      }
+    }
+
+    function checkPassStrength() {
+      const val = document.getElementById('newBranchPinUpdate').value;
+      const msg = document.getElementById('passStrengthMsg');
+      if (!val) { msg.innerText = ''; return; }
+      let score = 0;
+      if (val.length >= 8) score++;
+      if (/[A-Z]/.test(val) && /[a-z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+
+      if (score >= 3 && val.length >= 8) {
+        msg.innerText = 'Strength: Strong';
+        msg.style.color = '#10b981';
+      } else if (val.length >= 8) {
+        msg.innerText = 'Strength: Medium (add uppercase/symbols for stronger security)';
+        msg.style.color = '#f59e0b';
+      } else {
+        msg.innerText = 'Minimum 8 characters required';
+        msg.style.color = '#ef4444';
+      }
+    }
 
     function getSixMonthCutoffMs() {
       const d = new Date();
@@ -3226,9 +3922,16 @@
 
     function getOldRecords() {
       const cutoff = getSixMonthCutoffMs();
+      const netMap = {};
+      trades.forEach(t => {
+        if (t.status === 'CANCELLED') return;
+        const k = String(t.clientId || '').trim() + '|' + String(t.contract || '').trim().toUpperCase();
+        netMap[k] = (netMap[k] || 0) + (t.action === 'BUY' ? (Number(t.qty) || 0) : -(Number(t.qty) || 0));
+      });
       const oldTrades = trades.filter(t => {
         const ms = parseTradeDate(t);
-        return ms > 0 && ms < cutoff;
+        const k = String(t.clientId || '').trim() + '|' + String(t.contract || '').trim().toUpperCase();
+        return ms > 0 && ms < cutoff && (netMap[k] || 0) === 0;
       });
       const oldLedger = ledger.filter(l => {
         const ms = parseLedgerDateMs(l);
@@ -3302,28 +4005,27 @@
 
     async function confirmPruneOldData() {
       const pin = document.getElementById('pruneAdminPin').value.trim();
-      const pinHash = await sha256(pin);
-      const adminBranch = branches.find(b => b.role === 'admin' && b.pinHash === pinHash);
-      if (!adminBranch) return showToast("Incorrect Admin Password / PIN!");
+      if (!pin) return showToast("Enter Admin Password!");
+      const { cutoff, oldTrades } = getOldRecords();
+      const pruneTradeIds = new Set(oldTrades.map(t => t.id));
 
-      // Always save local backup before deleting
       downloadOldDataBackup(false);
 
-      const { cutoff } = getOldRecords();
-      trades = trades.filter(t => {
-        const ms = parseTradeDate(t);
-        return !(ms > 0 && ms < cutoff);
-      });
+      const res = await postToServerRaw({ action: "prune_old_data", adminPin: pin, cutoffMs: cutoff }, false);
+      if (res.unauthorized) { showToast('Session expired — please login again.'); logout(); return; }
+      if (!res.ok) {
+        return showToast(res.offline ? "Offline — cannot prune server." : ("Prune Failed: " + (res.message || "Invalid Password")));
+      }
+
+      trades = trades.filter(t => !pruneTradeIds.has(t.id));
       ledger = ledger.filter(l => {
         const ms = parseLedgerDateMs(l);
         return !(ms > 0 && ms < cutoff);
       });
       saveState();
-
-      syncToGoogleSheet({ action: "prune_old_data", cutoffMs: cutoff });
       closePruneModal();
       renderAll();
-      showToast("Old (>6 month) data backed up & cleared!");
+      showToast("Old (>6 month) net-zero data backed up & cleared!");
     }
 
     function renderScriptsManager() {
@@ -3334,9 +4036,9 @@
       const list = (q ? all.filter(s => s.name.includes(q)) : all).slice(0, 40);
       tbody.innerHTML = list.map(s => `
         <tr>
-          <td><b>${escapeHtml(s.name)}</b> <small style="color:var(--muted);">(${s.lot})</small></td>
-          <td>₹${Number(s.price).toFixed(2)}</td>
-          <td style="text-align:right;"><button class="btn-cancel" onclick="deleteScript('${escapeHtml(s.name)}')">Delete</button></td>
+          <td><b>${escapeHtml(s.name)}</b> <small style="color:var(--muted);">(${s.lot})</small>${s.lotChanged ? ` <span class="amber" style="font-size:10px; font-weight:700;">Lot Changed: ${s.prevLot}→${s.lot}</span>` : ''}</td>
+          <td>${Number(s.price) > 0 ? '₹' + Number(s.price).toFixed(2) : '<span style="color:var(--muted);">-</span>'}</td>
+          <td style="text-align:right;"><button class="btn-cancel" data-act="del-script" data-id="${escapeHtml(s.name)}">Delete</button></td>
         </tr>
       `).join('');
     }
@@ -3370,65 +4072,59 @@
       showToast(`Script ${sym} removed & synced!`);
     }
 
-    function togglePassVis(inputId, btn) {
-      const el = document.getElementById(inputId);
-      if (!el) return;
-      if (el.type === 'password') {
-        el.type = 'text';
-        btn.innerText = 'Hide';
-      } else {
-        el.type = 'password';
-        btn.innerText = 'Show';
-      }
-    }
-
-    function checkPassStrength() {
-      const val = document.getElementById('newBranchPinUpdate').value;
-      const msg = document.getElementById('passStrengthMsg');
-      if (!val) { msg.innerText = ''; return; }
-      let score = 0;
-      if (val.length >= 8) score++;
-      if (/[A-Z]/.test(val) && /[a-z]/.test(val)) score++;
-      if (/[0-9]/.test(val)) score++;
-      if (/[^A-Za-z0-9]/.test(val)) score++;
-
-      if (score >= 3) {
-        msg.innerText = 'Strength: Strong';
-        msg.style.color = '#10b981';
-      } else if (score === 2 || val.length >= 6) {
-        msg.innerText = 'Strength: Medium (add uppercase/symbols for stronger security)';
-        msg.style.color = '#f59e0b';
-      } else {
-        msg.innerText = 'Strength: Weak (use 8+ chars with letters, numbers & @#$)';
-        msg.style.color = '#ef4444';
-      }
-    }
-
     async function saveUpdatedPin() {
       const targetId = currentSession.role === 'admin'
         ? document.getElementById('pinTargetBranch').value
         : currentSession.branchId;
+      const oldPin = document.getElementById('oldBranchPinUpdate').value.trim();
       const newPin = document.getElementById('newBranchPinUpdate').value.trim();
       const confirmPin = document.getElementById('confirmBranchPinUpdate').value.trim();
 
-      if (newPin.length < 4) return showToast("Password / PIN must be at least 4 characters!");
+      if (!oldPin) return showToast("Enter current / old password!");
+      if (newPin.length < 8) return showToast("New password must be at least 8 characters!");
       if (newPin !== confirmPin) return showToast("Passwords do not match!");
-      const newHash = await sha256(newPin);
-      if (branches.some(b => b.id !== targetId && b.pinHash === newHash)) {
-        return showToast("This password is already used by another branch!");
-      }
 
-      const br = branches.find(b => b.id === targetId);
-      if (br) {
-        br.pinHash = newHash;
-        saveState();
-        syncToGoogleSheet({ action: "update_branch_pin", id: targetId, pinHash: newHash });
-        document.getElementById('newBranchPinUpdate').value = '';
-        document.getElementById('confirmBranchPinUpdate').value = '';
-        document.getElementById('passStrengthMsg').innerText = '';
-        showToast(`Password updated for ${br.name} & synced!`);
+      const ok = await syncToGoogleSheet({
+        action: "update_branch_pin",
+        id: targetId,
+        oldPin: oldPin,
+        newPin: newPin
+      });
+      if (!ok) return;
+
+      document.getElementById('oldBranchPinUpdate').value = '';
+      document.getElementById('newBranchPinUpdate').value = '';
+      document.getElementById('confirmBranchPinUpdate').value = '';
+      document.getElementById('passStrengthMsg').innerText = '';
+      showToast("Password updated & old sessions revoked!");
+      if (targetId === currentSession.branchId) {
+        setTimeout(logout, 1000);
       }
     }
+
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-act]');
+      if (!btn) return;
+      const act = btn.dataset.act;
+      const id = btn.dataset.id;
+      if (act === 'edit-trade') openEditTradeModal(id);
+      else if (act === 'del-trade') openDeleteModal(id);
+      else if (act === 'keep-trade') rejectCancel(id);
+      else if (act === 'req-del') openReqCancelModal(id);
+      else if (act === 'set-cmp') openSetCmpModal(btn.dataset.contract, parseFloat(btn.dataset.cmp || '0'));
+      else if (act === 'sel-branch') selectBranchForPin(id);
+      else if (act === 'edit-branch-share') openEditBranchShareModal(id, btn.dataset.share);
+      else if (act === 'toggle-branch') toggleBranchActive(id, btn.dataset.active === '1');
+      else if (act === 'daily-pdf') generateDailyPdf(id);
+      else if (act === 'open-bill') openBillModal(id);
+      else if (act === 'full-pdf') generatePdfBill(id);
+      else if (act === 'wa-bill') sendWhatsAppSummary(id);
+      else if (act === 'edit-client') startEditClient(id);
+      else if (act === 'del-client') openRemoveClientModal(id);
+      else if (act === 'del-script') deleteScript(id);
+    });
+
   </script>
 </body>
 </html>
