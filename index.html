@@ -2160,6 +2160,11 @@
       renderLedgerSummary();
       renderLedgerHistory();
       renderClientsList();
+      if (document.activeElement !== document.getElementById('priceInput')) {
+        const curInfo = getCmpInfo(buildContractString());
+        const tagEl = document.getElementById('priceSourceTag');
+        if (tagEl) tagEl.innerHTML = curInfo.missing ? '<span style="color:var(--muted); font-size:10px;">(No CMP)</span>' : renderCmpBadge(curInfo);
+      }
     }
 
     function renderClientsDropdown() {
